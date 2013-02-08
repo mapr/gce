@@ -642,7 +642,7 @@ create_metrics_db() {
 
 		maprcli volume create -name mapr.mysql -user mysql:fc \
 			-path $MYSQL_DATA_DIR -createparent true -topology / 
-		maprcli acl edit -type volume -name mapr.logs -user mysql:fc
+		maprcli acl edit -type volume -name mapr.mysql -user mysql:fc
 		if [ $? -eq 0 ] ; then
 				# Now we'll access the DATA_DIR via an NFS mount
 			MYSQL_DATA_DIR=${MAPR_FSMOUNT}${MYSQL_DATA_DIR}
