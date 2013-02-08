@@ -44,7 +44,7 @@ MAPR_VERSION=$(curl $murl_attr/maprversion)    # mapr version, eg. 1.2.3
 # A comma separated list of packages (without the "mapr-" prefix)
 # to be installed.   This script assumes that NONE of them have 
 # been installed.
-MAPR_PACKAGES=$(curl $murl_attr/maprpackages)
+MAPR_PACKAGES=$(curl -f $murl_attr/maprpackages)
 MAPR_PACKAGES=${MAPR_PACKAGES:-"core,fileserver"}
 
 # NOTE: We could be smart and look to see if THIS_IMAGE was a 
@@ -95,13 +95,83 @@ function update_os_deb() {
 	c apt-get install -y sysstat
 }
 
+# For CentOS and Fedora, the GCE environment does not support 
+# plugin modules to be added to the kernel ... so we don't
+# need the module-init-tools package.   Moreover, on several
+# occasions, updating that module cause strange behavior during
+# instance launch.
 function update_os_rpm() {
 	c yum makecache
-	c yum update -y
+	c yum update -y --exclude=module-init-tools
 	c yum install -y nfs-utils iputils libsysfs
 	c yum install -y ntp ntpdate
 
 	c yum install -y sysstat
+}
+
+# Make sure that NTP service is sync'ed and running
+# Key Assumption: the /etc/ntp.conf file is reasonable for the 
+#	hosting cloud platform.   We could shove our own NTP servers into
+#	place, but that seems like a risk.
+function update_ntp_config() {
+	echo "  updating NTP configuration" >> $LOG
+
+		# Make sure the service is enabled at boot-up
+	if [ -x /etc/init.d/ntp ] ; then
+		SERVICE_SCRIPT=/etc/init.d/ntp
+		update-rc.d ntp enable
+	elif [ -x /etc/init.d/ntpd ] ; then
+		SERVICE_SCRIPT=/etc/init.d/ntpd
+		chkconfig ntpd on
+	else
+		return 0
+	fi
+
+	$SERVICE_SCRIPT stop
+	ntpdate pool.ntp.org
+	$SERVICE_SCRIPT start
+
+		# TBD: copy in /usr/share/zoneinfo file based on 
+		# zone in which the instance is deployed
+	zoneInfo=$(curl -f ${murl_top}/zone)
+	curZone=`basename "${zoneInfo}"`
+	curTZ=`date +"%Z"`
+	echo "    Instance zone is $curZone; TZ setting is $curTZ" >> $LOG
+
+		# Update the timezones we're sure of.
+	TZ_HOME=/usr/share/zoneinfo/posix
+	case $curZone in
+		europe-west*)
+			newTZ="CET"
+			;;
+		us-central*)
+			newTZ="CST6CDT"
+			;;
+		us-east*)
+			newTZ="EST5EDT"
+			;;
+		*)
+			newTZ=${curTZ}
+	esac
+
+	if [ -n "${newTZ}"  -a  -f $TZ_HOME/$newTZ  -a  "${curTZ}" != "${newTZ}" ] 
+	then
+		echo "    Updating TZ to $newTZ" >> $LOG
+		cp -p $TZ_HOME/$newTZ /etc/localtime
+	fi
+}
+
+function update_ssh_config() {
+	echo "  updating SSH configuration" >> $LOG
+
+	# allow ssh via keys (some virtual environments disable this)
+  sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
+
+	# allow ssh password prompt (only for our dev clusters)
+  sed -i 's/ChallengeResponseAuthentication .*no$/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
+
+	[ -x /etc/init.d/ssh ]   &&  /etc/init.d/ssh  restart
+	[ -x /etc/init.d/sshd ]  &&  /etc/init.d/sshd restart
 }
 
 function update_os() {
@@ -121,14 +191,8 @@ function update_os() {
   [ -f $SELINUX_CONFIG ] && \
 	sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' $SELINUX_CONFIG
 
-	# allow ssh via keys (some virtual environments disable this)
-  sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
-
-	# allow ssh password prompt (only for our dev clusters)
-  sed -i 's/ChallengeResponseAuthentication .*no$/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
-
-	[ -x /etc/init.d/ssh ]   &&  /etc/init.d/ssh  restart
-	[ -x /etc/init.d/sshd ]  &&  /etc/init.d/sshd restart
+	update_ntp_config
+	update_ssh_config
 }
 
 # Whatever version of Java we want, we can do here.  The
