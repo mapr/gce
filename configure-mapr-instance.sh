@@ -504,16 +504,26 @@ configure_mapr_metrics() {
 configure_mapr_services() {
 	echo "Updating configuration for MapR services" >> $LOG
 
-# Additional customizations ... to be customized based
-# on instane type and other deployment details.   This is only
+	CLDB_CONF_FILE=${MAPR_HOME}/conf/cldb.conf
+	MFS_CONF_FILE=${MAPR_HOME}/conf/mfs.conf
+	WARDEN_CONF_FILE=${MAPR_HOME}/conf/warden.conf
+
+# Additional customizations of MapR installation ... to be done based
+# on instance type and other deployment details.   This is only
 # necessary if the default configuration files from configure.sh
 # are sub-optimal for Cloud deployments.  Some examples might be:
-#	
+
+
 # 	give MFS more memory -- only on slaves, not on masters
-#sed -i 's/service.command.mfs.heapsize.percent=.*$/service.command.mfs.heapsize.percent=35/'
-#
+#sed -i 's/service.command.mfs.heapsize.percent=.*$/service.command.mfs.heapsize.percent=35/' $MFS_CONF_FILE
+
 #	give CLDB more threads 
-# sed -i 's/cldb.numthreads=10/cldb.numthreads=40/' $MAPR_HOME/conf/cldb.conf
+# sed -i 's/cldb.numthreads=10/cldb.numthreads=40/' $CLDB_CONF_FILE
+
+		# Disable central configuration (spinning up Java processes
+		# every 5 minutes doesn't help; we'll run it on our own
+	sed -i 's/centralconfig.enabled=true/centralconfig.enabled=false/' \
+            ${WARDEN_CONF_FILE}
 }
 
 #
@@ -640,8 +650,11 @@ create_metrics_db() {
 	if [ -f $MAPR_HOME/roles/nfs  -o  -n "${MAPR_NFS_SERVER}" ] ; then
 		MYSQL_DATA_DIR=/var/mapr/mysql
 
+		dtKey="cldb.default.volume.topology"
+		defTopology=`maprcli config load -keys $dtKey | grep -v $dtKey`
+
 		maprcli volume create -name mapr.mysql -user mysql:fc \
-			-path $MYSQL_DATA_DIR -createparent true -topology / 
+			-path $MYSQL_DATA_DIR -createparent true -topology ${defTopology:-/}
 		maprcli acl edit -type volume -name mapr.mysql -user mysql:fc
 		if [ $? -eq 0 ] ; then
 				# Now we'll access the DATA_DIR via an NFS mount
@@ -840,9 +853,12 @@ finalize_mapr_cluster() {
 			# Probably don't need the "-createparent true" option,
 			# since mapr.logs should be mounted to /var/mapr ...
 			# but just in case it isn't ...
+		dtKey="cldb.default.volume.topology"
+		defTopology=`maprcli config load -keys $dtKey | grep -v $dtKey`
+
 		echo "Creating volume for centralized logs" >> $LOG
 		maprcli volume create -name mapr.logs \
-			-path /var/mapr/logs -createparent true -topology / 
+			-path /var/mapr/logs -createparent true -topology ${defTopology:-/} 
 
 			# If the volume exists (either because we created it
 			# or another node in the cluster already did it for us,

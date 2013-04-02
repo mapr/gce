@@ -93,6 +93,7 @@ function update_os_deb() {
 	c apt-get install -y ntp
 
 	c apt-get install -y sysstat
+	apt-get install -y clustershell pdsh
 }
 
 # For CentOS and Fedora, the GCE environment does not support 
@@ -107,6 +108,7 @@ function update_os_rpm() {
 	c yum install -y ntp ntpdate
 
 	c yum install -y sysstat
+	yum install -y clustershell pdsh
 }
 
 # Make sure that NTP service is sync'ed and running
@@ -246,7 +248,7 @@ function install_openjdk_rpm() {
     echo "	JAVA_HOME=$JAVA_HOME" >> $LOG
 }
 
-function install_oraclejdk_deb() {
+function install_oraclejdk_rpm() {
     echo "Automated installation of Oracle JDK for rpm distros is not supported" >> $LOG
     echo "Falling back to OpenJDK" >> $LOG
 	install_openjdk_rpm
