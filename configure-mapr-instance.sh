@@ -78,8 +78,12 @@ sleep 3
 murl_top=http://metadata/0.1/meta-data
 murl_attr="${murl_top}/attributes"
 
-THIS_FQDN=$(curl $murl_top/hostname)
-THIS_HOST=${THIS_FQDN/.*/}
+THIS_FQDN=$(curl -f $murl_top/hostname)
+if [ -z "${THIS_FQDN}" ] ; then
+	THIS_HOST=${THIS_FQDN/.*/}
+else
+	THIS_HOST=`/bin/hostname`
+fi
 
 MAPR_HOME=$(curl -f $murl_attr/maprhome)	# software installation directory
 MAPR_HOME=${MAPR_HOME:-"/opt/mapr"}
@@ -607,6 +611,7 @@ configure_mapr_nfs() {
 #	above ... so don't rearrange this code without moving that as well
 #
 create_metrics_db() {
+	[ -z "$MAPR_METRICS_SERVER"  -o  -z "$THIS_HOST" ] && return
 	[ $MAPR_METRICS_SERVER != $THIS_HOST ] && return
 
 	echo "Creating MapR metrics database" >> $LOG
@@ -669,6 +674,11 @@ create_metrics_db() {
 			    sedArg="`echo "$MYSQL_DATA_DIR" | sed -e 's/\//\\\\\//g'`"
 				sed -e "s/^datadir[ 	=].*$/datadir = ${sedArg}/g" \
 					-i".localdata" $MYCNF 
+
+					# Default MySql 5.5 has innodb, but doesn't
+					# specify a data file.  We'll do it here.
+				sed -e ""/^#.*InnoDB$/a\
+innodb_data_file_path=ibdata1:10M:autoextend:max:1024M"
 
 					# On Ubuntu, AppArmor gets in the way of
 					# mysqld writing to the NFS directory; We'll 

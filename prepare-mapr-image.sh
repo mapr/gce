@@ -166,11 +166,17 @@ function update_ntp_config() {
 function update_ssh_config() {
 	echo "  updating SSH configuration" >> $LOG
 
-	# allow ssh via keys (some virtual environments disable this)
-  sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
+	SSHD_CONFIG=/etc/ssh/sshd_config
 
-	# allow ssh password prompt (only for our dev clusters)
-  sed -i 's/ChallengeResponseAuthentication .*no$/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
+	# allow ssh via keys (some virtual environments disable this)
+  sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' $SSHD_CONFIG
+
+	# For Dev Clusters ONLY !!!
+	#	allow ssh password prompt (only for our dev clusters)
+	#	root login via passwordless ssh
+  sed -i 's/ChallengeResponseAuthentication .*no$/ChallengeResponseAuthentication yes/' $SSHD_CONFIG
+  sed -i 's/PasswordAuthentication .*no$/PasswordAuthentication yes/' $SSHD_CONFIG
+  sed -i 's/PermitRootLogin .*no$/PermitRootLogin yes/' $SSHD_CONFIG
 
 	[ -x /etc/init.d/ssh ]   &&  /etc/init.d/ssh  restart
 	[ -x /etc/init.d/sshd ]  &&  /etc/init.d/sshd restart
@@ -231,6 +237,8 @@ function install_oraclejdk_deb() {
 
 	apt-get install -y x11-utils
 	apt-get install -y oracle-jdk7-installer
+
+#	update-java-alternatives -s java-7-oracle
 
 	JAVA_HOME=/usr/lib/jvm/java-7-oracle
 	export JAVA_HOME
