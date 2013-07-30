@@ -85,8 +85,13 @@ else
 	THIS_HOST=`/bin/hostname`
 fi
 
+THIS_IMAGE=$(curl $murl_attr/image)    # name of initial image loaded here
+GCE_PROJECT=$(curl -f $murl_top/project-id)
+
 MAPR_HOME=$(curl -f $murl_attr/maprhome)	# software installation directory
 MAPR_HOME=${MAPR_HOME:-"/opt/mapr"}
+MAPR_UID=$(curl -f $murl_attr/mapruid)
+MAPR_UID=${MAPR_UID:-"2000"}
 MAPR_USER=$(curl -f $murl_attr/mapruser)
 MAPR_USER=${MAPR_USER:-"mapr"}
 MAPR_GROUP=$(curl -f $murl_attr/maprgroup)
@@ -193,8 +198,8 @@ function add_mapr_user() {
 	id $MAPR_USER &> /dev/null
 	[ $? -eq 0 ] && return $? ;
 
-	echo "useradd -u 2000 -c MapR -m -s /bin/bash" >> $LOG
-	useradd -u 2000 -c "MapR" -m -s /bin/bash $MAPR_USER 2> /dev/null
+	echo "useradd -u $MAPR_UID -c MapR -m -s /bin/bash" >> $LOG
+	useradd -u $MAPR_UID -c "MapR" -m -s /bin/bash $MAPR_USER 2> /dev/null
 	if [ $? -ne 0 ] ; then
 			# Assume failure was dup uid; try with default uid assignment
 		echo "useradd returned $?; trying auto-generated uid" >> $LOG
@@ -517,7 +522,6 @@ configure_mapr_services() {
 # necessary if the default configuration files from configure.sh
 # are sub-optimal for Cloud deployments.  Some examples might be:
 
-
 # 	give MFS more memory -- only on slaves, not on masters
 #sed -i 's/service.command.mfs.heapsize.percent=.*$/service.command.mfs.heapsize.percent=35/' $MFS_CONF_FILE
 
@@ -525,7 +529,7 @@ configure_mapr_services() {
 # sed -i 's/cldb.numthreads=10/cldb.numthreads=40/' $CLDB_CONF_FILE
 
 		# Disable central configuration (spinning up Java processes
-		# every 5 minutes doesn't help; we'll run it on our own
+		# every 5 minutes doesn't help; we'll run it on our own)
 	sed -i 's/centralconfig.enabled=true/centralconfig.enabled=false/' \
             ${WARDEN_CONF_FILE}
 }
@@ -836,10 +840,28 @@ finalize_mapr_cluster() {
 	fi
 
 		#
+		# Create a home directory for the user
+		#
 		# Enable centralized logging
 		#	need to wait for mapr.logs to exist before we can
 		#	create our entry point
 		#
+	dtKey="cldb.default.volume.topology"
+	defTopology=`maprcli config load -keys $dtKey | grep -v $dtKey`
+
+	maprcli volume info -name users &> /dev/null
+	if [ $? -eq 0 ] ; then
+		HOME_VOL=${MAPR_USER}_home
+
+		maprcli volume info -name $HOME_VOL &> /dev/null
+		if [ $? -ne 0 ] ; then
+			echo "Creating home volume for ${MAPR_USER}" >> $LOG
+			maprcli volume create -name ${HOME_VOL} \
+				-path /user/${MAPR_USER} -topology ${defTopology:-/} \
+				-user ${MAPR_USER}:fc 
+		fi
+	fi
+
 	VAR_ONLINE=0
 	echo "Waiting for mapr.var volume to come on line" >> $LOG
 	i=0
@@ -863,9 +885,6 @@ finalize_mapr_cluster() {
 			# Probably don't need the "-createparent true" option,
 			# since mapr.logs should be mounted to /var/mapr ...
 			# but just in case it isn't ...
-		dtKey="cldb.default.volume.topology"
-		defTopology=`maprcli config load -keys $dtKey | grep -v $dtKey`
-
 		echo "Creating volume for centralized logs" >> $LOG
 		maprcli volume create -name mapr.logs \
 			-path /var/mapr/logs -createparent true -topology ${defTopology:-/} 
