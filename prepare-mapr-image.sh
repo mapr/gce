@@ -16,7 +16,7 @@
 #	- Basic distro differences (APT-GET vs YUM, etc) can be handled
 #	    There are so few differences, it seemed better to manage one script.
 #
-# Tested with MapR 2.0.x and 2.1.x
+# Tested with MapR 2.0.x, 2.1.x, and 3.x
 #
 # JAVA
 #	This script default to OpenJDK; the logic to support Oracle JDK 
@@ -51,10 +51,18 @@ MAPR_PACKAGES=${MAPR_PACKAGES:-"core,fileserver"}
 # MapR image, and bail on all the rest of this script.
 
 # Definitions for our installation
-#	These could just as easily be meta-data if we wanted to do extra work
-MAPR_HOME=/opt/mapr
-MAPR_USER=mapr
-MAPR_PASSWD=MapR
+#   These should use the same meta-data definitions as the configure-* script
+#
+MAPR_HOME=$(curl -f $murl_attr/maprhome)
+MAPR_HOME=${MAPR_HOME:-"/opt/mapr"}
+MAPR_UID=$(curl -f $murl_attr/mapruid)
+MAPR_UID=${MAPR_UID:-"2000"}
+MAPR_USER=$(curl -f $murl_attr/mapruser)
+MAPR_USER=${MAPR_USER:-"mapr"}
+MAPR_GROUP=$(curl -f $murl_attr/maprgroup)
+MAPR_GROUP=${MAPR_GROUP:-"mapr"}
+MAPR_PASSWD=$(curl -f $murl_attr/maprpasswd)
+MAPR_PASSWD=${MAPR_PASSWD:-"MapR"}
 
 
 LOG=/tmp/prepare-mapr-image.log
@@ -93,7 +101,7 @@ function update_os_deb() {
 	c apt-get install -y ntp
 
 	c apt-get install -y sysstat
-	apt-get install -y clustershell pdsh
+	apt-get install -y clustershell pdsh realpath
 }
 
 # For CentOS and Fedora, the GCE environment does not support 
@@ -266,6 +274,40 @@ function install_oraclejdk_rpm() {
 function install_java() {
 	echo Installing JAVA >> $LOG
 
+		# If Java is already installed, simply make sure we know
+		# the JAVA_HOME.   We should be smarter about checking for
+		# a valid version, but since both 1.6 and 1.7 work, we should
+		# be safe.
+		#
+	javacmd=`which java`
+	if [ $? -eq 0 ] ;  then
+		echo "Java already installed on this instance" >> $LOG
+		java -version 2>&1 | head -1 >> $LOG
+
+			# We could be linked to the JRE or JDK version; we want
+			# the REAL jdk, so look for javac in the directory we choose
+		jcmd=`python -c "import os; print os.path.realpath('$javacmd')"`
+		if [ -x ${jcmd%/jre/bin/java}/bin/javac ] ; then
+			JAVA_HOME=${jcmd%/jre/bin/java}
+		elif [ -x ${jcmd%/java}/javac ] ; then
+			JAVA_HOME=${jcmd%/java}
+		else
+			JAVA_HOME=""
+		fi
+
+		if [ -n "${JAVA_HOME:-}" ] ; then
+			echo "	JAVA_HOME=$JAVA_HOME" | tee -a $LOG
+
+			echo updating /etc/profile.d/javahome.sh >> $LOG
+			echo "JAVA_HOME=${JAVA_HOME}" >> /etc/profile.d/javahome.sh
+			echo "export JAVA_HOME" >> /etc/profile.d/javahome.sh
+
+			return 0
+		fi
+
+		echo "Could not identify JAVA_HOME; will install Java ourselves" >> $LOG
+	fi
+
 	if which dpkg &> /dev/null; then
 		install_openjdk_deb
 	elif which rpm &> /dev/null; then
@@ -290,8 +332,8 @@ function add_mapr_user() {
 	id $MAPR_USER &> /dev/null
 	[ $? -eq 0 ] && return $? ;
 
-	echo "useradd -u 2000 -c MapR -m -s /bin/bash" >> $LOG
-	useradd -u 2000 -c "MapR" -m -s /bin/bash $MAPR_USER 2> /dev/null
+	echo "useradd -u $MAPR_UID -c MapR -m -s /bin/bash" >> $LOG
+	useradd -u $MAPR_UID -c "MapR" -m -s /bin/bash $MAPR_USER 2> /dev/null
 	if [ $? -ne 0 ] ; then
 			# Assume failure was dup uid; try with default uid assignment
 		echo "useradd returned $?; trying auto-generated uid" >> $LOG
@@ -374,6 +416,7 @@ function setup_mapr_repo_rpm() {
 [MapR]
 name=MapR Version $MAPR_VERSION media
 baseurl=$MAPR_PKG
+${MAPR_PKG//package.mapr.com/archive.mapr.com}
 enabled=1
 gpgcheck=0
 protected=1
@@ -381,6 +424,7 @@ protected=1
 [MapR_ecosystem]
 name=MapR Ecosystem Components
 baseurl=$MAPR_ECO
+${MAPR_ECO//package.mapr.com/archive.mapr.com}
 enabled=1
 gpgcheck=0
 protected=1
