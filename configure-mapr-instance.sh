@@ -86,7 +86,7 @@ else
 fi
 
 THIS_IMAGE=$(curl $murl_attr/image)    # name of initial image loaded here
-GCE_PROJECT=$(curl -f $murl_top/project-id)
+GCE_PROJECT=$(curl -f $murl_top/project-id) 
 
 MAPR_HOME=$(curl -f $murl_attr/maprhome)	# software installation directory
 MAPR_HOME=${MAPR_HOME:-"/opt/mapr"}
@@ -298,7 +298,8 @@ install_mapr_packages() {
 	fi
 
 	if which dpkg &> /dev/null ; then
-		MAPR_INSTALLED=`dpkg --list mapr-* | grep ^ii | awk '{print $2}'`
+#		MAPR_INSTALLED=`dpkg --list mapr-* | grep ^ii | awk '{print $2}'`
+		MAPR_INSTALLED=`dpkg --get-selections mapr-* | awk '{print $1}'`
 	else
 		MAPR_INSTALLED=`rpm -q --all --qf "%{NAME}\n" | grep ^mapr `
 	fi
@@ -623,6 +624,7 @@ create_metrics_db() {
 		# Install MySQL, update MySQL config and restart the server
 	MYSQL_OK=1
 	if  which dpkg &> /dev/null ; then
+		export DEBIAN_FRONTEND=noninteractive
 		apt-get install -y mysql-server mysql-client
 
 		MYCNF=/etc/mysql/my.cnf
@@ -663,7 +665,7 @@ create_metrics_db() {
 		defTopology=`maprcli config load -keys $dtKey | grep -v $dtKey`
 
 		maprcli volume create -name mapr.mysql -user mysql:fc \
-			-path $MYSQL_DATA_DIR -createparent true -topology ${defTopology:-/}
+		  -path $MYSQL_DATA_DIR -createparent true -topology ${defTopology:-/} 
 		maprcli acl edit -type volume -name mapr.mysql -user mysql:fc
 		if [ $? -eq 0 ] ; then
 				# Now we'll access the DATA_DIR via an NFS mount
@@ -679,10 +681,11 @@ create_metrics_db() {
 				sed -e "s/^datadir[ 	=].*$/datadir = ${sedArg}/g" \
 					-i".localdata" $MYCNF 
 
-					# Default MySql 5.5 has innodb, but doesn't
-					# specify a data file.  We'll do it here.
+                    # Default MySql 5.5 has innodb, but doesn't
+					# specify a data file.  We'll do it here
+					# if we see InnoDB in the MYCNF file
 				sed -e "/^#.*InnoDB$/a\
-innodb_data_file_path=ibdata1:10M:autoextend:max:1024M"
+innodb_data_file_path=ibdata1:10M:autoextend:max:1024M" $MYCNF
 
 					# On Ubuntu, AppArmor gets in the way of
 					# mysqld writing to the NFS directory; We'll 
@@ -737,18 +740,20 @@ metrics_EOF
 }
 
 
+# For now, we won't error-out if the enabling auto-start of the
+# mapr-services fails.  Debian seems to have problems with update-rc.d.
 function enable_mapr_services() 
 {
 	echo Enabling  MapR services >> $LOG
 
 	if which update-rc.d &> /dev/null; then
-		c update-rc.d -f mapr-warden enable
+		update-rc.d -f mapr-warden enable
 		[ -f $MAPR_HOME/roles/zookeeper ] && \
-			c update-rc.d -f mapr-zookeeper enable
+			update-rc.d -f mapr-zookeeper enable
 	elif which chkconfig &> /dev/null; then
-		c chkconfig mapr-warden on
+		chkconfig mapr-warden on
 		[ -f $MAPR_HOME/roles/zookeeper ] && \
-			c chkconfig mapr-zookeeper on
+			chkconfig mapr-zookeeper on
 	fi
 }
 
@@ -841,7 +846,7 @@ finalize_mapr_cluster() {
 
 		#
 		# Create a home directory for the user
-		#
+		#	
 		# Enable centralized logging
 		#	need to wait for mapr.logs to exist before we can
 		#	create our entry point
@@ -887,7 +892,7 @@ finalize_mapr_cluster() {
 			# but just in case it isn't ...
 		echo "Creating volume for centralized logs" >> $LOG
 		maprcli volume create -name mapr.logs \
-			-path /var/mapr/logs -createparent true -topology ${defTopology:-/} 
+			-path /var/mapr/logs -createparent true -topology ${defTopology:-/}
 
 			# If the volume exists (either because we created it
 			# or another node in the cluster already did it for us,
