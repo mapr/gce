@@ -681,7 +681,7 @@ create_metrics_db() {
 
 					# Default MySql 5.5 has innodb, but doesn't
 					# specify a data file.  We'll do it here.
-				sed -e ""/^#.*InnoDB$/a\
+				sed -e "/^#.*InnoDB$/a\
 innodb_data_file_path=ibdata1:10M:autoextend:max:1024M"
 
 					# On Ubuntu, AppArmor gets in the way of
@@ -701,7 +701,7 @@ innodb_data_file_path=ibdata1:10M:autoextend:max:1024M"
 					# If this fails, go back to the default datadir
 				mysql_install_db
 				if [ $? -ne 0 ] ; then
-					echo "Failed to initialize MapRFS datadir ($MYSQL_DATA_DIR}" >> $LOG
+					echo "Failed to initialize MapRFS datadir {$MYSQL_DATA_DIR}" >> $LOG
 					echo "Restoring localdata configuration" >> $LOG
 					cp -p ${MYCNF}.localdata ${MYCNF}
 				fi
