@@ -89,18 +89,35 @@ c() {
     }
 }
 
+# For CentOS, add the EPEL repo
+#   NOTE: this target will change FREQUENTLY !!!
+#
+function add_epel_repo() {
+    EPEL_RPM=/tmp/epel.rpm
+    CVER=`lsb_release -r | awk '{print $2}'`
+    if [ ${CVER%.*} -eq 5 ] ; then
+        EPEL_LOC="epel/5/x86_64/epel-release-5-4.noarch.rpm"
+    else
+        EPEL_LOC="epel/6/x86_64/epel-release-6-8.noarch.rpm"
+    fi
+
+    wget -O $EPEL_RPM http://download.fedoraproject.org/pub/$EPEL_LOC
+    [ $? -eq 0 ] && rpm --quiet -i $EPEL_RPM
+}
+
 # The "customized" debian distributions often have configuration
 # files that should not be overwritten during the upgrade process.
 # We need the Dpkg::Options arg so that we don't get an error
 # during the upgrad operation that will cause us to bail out
 # right away.
 function update_os_deb() {
-	c apt-get update
+	apt-get update
 	c apt-get upgrade -y -o Dpkg::Options::="--force-confdef,confold"
 	c apt-get install -y nfs-common iputils-arping libsysfs2
 	c apt-get install -y ntp
 
 	c apt-get install -y sysstat
+	apt-get install -y dnsutils
 	apt-get install -y clustershell pdsh realpath
 }
 
@@ -110,7 +127,9 @@ function update_os_deb() {
 # occasions, updating that module cause strange behavior during
 # instance launch.
 function update_os_rpm() {
-	c yum makecache
+	add_epel_repo
+
+	yum makecache
 	c yum update -y --exclude=module-init-tools
 	c yum install -y nfs-utils iputils libsysfs
 	c yum install -y ntp ntpdate
@@ -429,20 +448,6 @@ enabled=1
 gpgcheck=0
 protected=1
 EOF_redhat
-
-        # Metrics requires some packages in EPEL ... so we'll
-        # add those repositories as well
-        #   NOTE: this target will change FREQUENTLY !!!
-    EPEL_RPM=/tmp/epel.rpm
-    CVER=`lsb_release -r | awk '{print $2}'`
-    if [ ${CVER%.*} -eq 5 ] ; then
-        EPEL_LOC="epel/5/x86_64/epel-release-5-4.noarch.rpm"
-    else
-        EPEL_LOC="epel/6/x86_64/epel-release-6-8.noarch.rpm"
-    fi
-
-    wget -O $EPEL_RPM http://download.fedoraproject.org/pub/$EPEL_LOC
-    [ $? -eq 0 ] && rpm --quiet -i $EPEL_RPM
 
     yum makecache
 }
