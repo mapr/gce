@@ -1,0 +1,6 @@
+# Simple 3-node M5 cluster 
+#	Note: 3 zookeepers, 2 cldb's and tasktrackers, nfs on every node
+#
+node1:zookeeper,cldb,fileserver,tasktracker,nfs,webserver
+node2:zookeeper,cldb,fileserver,tasktracker,nfs
+node3:zookeeper,jobtracker,fileserver,tasktracker,nfs
