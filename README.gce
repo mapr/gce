@@ -1,46 +1,74 @@
-CONTENTS
---------
-	create-mapr-image.sh : use gcutil to create a virtual instance
-		that can be used as a base image for later cluster creation.
-		Using a base image does not save much time over 
-		"install everything at instantiation".  This script uses
-		gcutil to create an instance and passes in the
-		prepare-mapr-image.sh script as the startup process..
+DIRECTORY CONTENTS
+------------------
+	launch-mapr-cluster.sh : 
+		High-level script that uses the specifications from a 
+		simple configuration file (see the *.lst examples)
+		to deploy a cluster in your GCE environment.
 
-	prepare-mapr-image.sh : Install key dependencies (eg Java) and
-		specified MapR software.  Script is used by create-mapr-image.sh,
-		and by configure-mapr-instance.sh (if passed in as metadata).  
+	*node.lst :
+		Sample configuration files to be used by launch-mapr-cluster.sh
+
+	create-mapr-image.sh : 
+		Creates a virtual instance that can be used as a base image 
+		for later cluster creation.  Using a base image does not save 
+		much time over "install everything at instantiation".  However,
+		you may want to customize a base image (with specific user 
+		accounts, additional non-MapR software, etc).  
+			Details: uses gcutil to create an instance and passes in 
+			the prepare-mapr-image.sh script as the startup process.
+
+	prepare-mapr-image.sh : 
+		Install key dependencies (eg Java) and specified MapR software.  
+		Script is used by create-mapr-image.sh, and by 
+		configure-mapr-instance.sh (if passed in as metadata).  
 		The goal is to do the initial O/S configuration and enough useful
-		preparation to deliver a reasonable image to be used to speed
-		up deployment of a full cluster (rather than starting with
-		just an O/S installation).
+		preparation to deliver a stable, consistent base on which
+		to build a full cluster.  
 
-	launch-mr-cluster.sh : simple script to create a multi-node 
-		MapReduce cluster within the GCE environment.  Can take as a 
-		base image EITHER an image generated via the create-mapr-image.sh 
-		script OR a basic Linux installation.  
-			Recommended option: use basic Linux images only
-
-	configure-mapr-instance.sh : configuration script executed on each
-		instantiated VM.  The script will confirm proper installation
-		of MapR software (via prepare-mapr-image.sh if necessary) and
-		the complete the configuration based on metadata passed in
-		to the script.
+	configure-mapr-instance.sh : 
+		Configures the MapR software based on meta-data passed in
+		to the deployed instance.  
 		
+	launch-mr-cluster.sh (obsolete): 
+		Very simple script to create a multi-node 
+		MapReduce cluster within the GCE environment.  The script
+		takes a limited view of of cluster features (using "masters"
+		and "slaves" rather than leveraging the service-oriented 
+		model of MapR).  
+
+
+GETTING STARTED
+---------------
+Ensure that your environment is ready to support GCE deployments
+	- a GCE project exists on which you can deploy instances
+	- gcutil is installed (be sure to download the latest version)
+	- your default GCE credentials are established
+
+Use launch-mapr-cluster.sh to create your first cluster :
+	./launch-mapr-cluster.sh \
+		--cluster TestCluster \
+		--node-name MyTest \
+		--mapr-version 2.1.2 \
+		--config-file 3node.lst \
+		--image centos-6-v20130723 \
+		--machine-type n1-standard-2-d"
+
 
 BACKGROUND READING
 ------------------
 	http://mapr.com/doc/display/MapR/Installing+MapR+Software
 
 
+ADVANCED TOPICS
+---------------
 # Creating a new image for Google Compute with create-mapr-image.sh script
 #	(which invokes prepare-mapr-image.sh on the instantiated virtual machine)
 #
-# Assumptions
-#	- gcutil is installed on your client system
-#	- a GCE project exists on which you can deploy instances
-#	- that same GCE project has GoogleStorage capacity for you to store
-#	  the tarballs of the root images.
+# A constomized image can be used with the launch-mapr-cluster.sh script,
+# and may simplify non-MapR customizations you wish to make.
+#
+# Be sure that same GCE project has GoogleStorage capacity for you to store
+# the tarballs of the boot images.
 
 
 NOTE:  Skip to Step 5 for most deployments ... no need for generating
@@ -52,18 +80,17 @@ Step 0 : Understanding the GCE model
 ------------------------------------
 	The scripts take advantage of the Google Compute Engine infrastructure,
 	which allows configuration scripts and other meta-data to be passed
-	in to an instance being launched in the cloud.  
+	in to an instance being launched in the cloud.  You'll want to
+	have the latest gcutil tool installed and configured on your
+	client system.
 
 
 Step 1 : Create a running instance from which to generate MapR base image
 -------------------------------------------------------------------------
 	The create-mapr-image.sh script handles this task.
 	It takes the GCE project as an argument, along with the base image 
-	type (eg Ubuntu-12-04 or Centos-6-2) and the MapR version.   The image 
+	type (eg Debian-[67] or Centos-6) and the MapR version.   The image 
 	type will come from Google.
-		create-map-image.sh passes the prepare-mapr-image.sh into the
-		launched instance in order to install prerequesites and some
-		basic MapR software.
 
 	You can ssh in to the instance once it's running and confirm 
 	the proper setup.   The log file from prepare-mapr-image.sh is
@@ -71,7 +98,8 @@ Step 1 : Create a running instance from which to generate MapR base image
 	sofware was installed successfully.
 		NOTE: you will be able to access this running instance
 		via SSH  BEFORE  the prepare-mapr-image.sh script is complete.
-		Be careful not to mess anything up.  A good sanity check is
+		Be careful not take any action that might disrupt the execution
+		of prepare-mapr-image.sh.  A good sanity check is
 		to watch for the availability of the mapr user and the
 		presence of the /opt/mapr software installation directory.
 
@@ -120,7 +148,8 @@ Step 4 : Test out the instantiation of the instance
 			--zone=us-central2-a \
 			--machine_type=n1-standard-2-d \
 			--image="mapr-211-17042-trial-ubuntu-1204" \
-			--wait_until_running mapr1
+			--wait_until_running \
+			mapr1
 
 
 Step 5 : Test out custom instantiation as done by launch*cluster scripts
@@ -133,5 +162,4 @@ Step 5 : Test out custom instantiation as done by launch*cluster scripts
 	in prepare-mapr-image.sh vs when the image is instantiated 
 	in a cluster).
 
-	
 
