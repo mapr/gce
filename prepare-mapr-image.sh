@@ -39,6 +39,7 @@ murl_attr="${murl_top}/attributes"
 THIS_FQDN=$(curl $murl_top/hostname)
 THIS_HOST=${THIS_FQDN/.*/}
 THIS_IMAGE=$(curl $murl_attr/image)    # name of initial image loaded here
+GCE_PROJECT=$(curl -f $murl_top/project-id) 
 MAPR_VERSION=$(curl $murl_attr/maprversion)    # mapr version, eg. 1.2.3
 
 # A comma separated list of packages (without the "mapr-" prefix)
@@ -51,7 +52,7 @@ MAPR_PACKAGES=${MAPR_PACKAGES:-"core,fileserver"}
 # MapR image, and bail on all the rest of this script.
 
 # Definitions for our installation
-#   These should use the same meta-data definitions as the configure-* script
+#	These should use the same meta-data definitions as the configure-* script
 #
 MAPR_HOME=$(curl -f $murl_attr/maprhome)
 MAPR_HOME=${MAPR_HOME:-"/opt/mapr"}
@@ -89,6 +90,7 @@ c() {
     }
 }
 
+
 # For CentOS, add the EPEL repo
 #   NOTE: this target will change FREQUENTLY !!!
 #
@@ -105,6 +107,7 @@ function add_epel_repo() {
     [ $? -eq 0 ] && rpm --quiet -i $EPEL_RPM
 }
 
+
 # The "customized" debian distributions often have configuration
 # files that should not be overwritten during the upgrade process.
 # We need the Dpkg::Options arg so that we don't get an error
@@ -116,6 +119,7 @@ function update_os_deb() {
 	c apt-get install -y nfs-common iputils-arping libsysfs2
 	c apt-get install -y ntp
 
+	c apt-get install -y syslinux sdparm
 	c apt-get install -y sysstat
 	apt-get install -y dnsutils
 	apt-get install -y clustershell pdsh realpath
@@ -134,6 +138,7 @@ function update_os_rpm() {
 	c yum install -y nfs-utils iputils libsysfs
 	c yum install -y ntp ntpdate
 
+	c yum install -y syslinux sdparm
 	c yum install -y sysstat
 	yum install -y clustershell pdsh
 }
@@ -222,9 +227,17 @@ function update_os() {
   echo 4096 1048576 4194304 > /proc/sys/net/ipv4/tcp_rmem  
 #  sysctl -w vm.overcommit_memory=1  # swap behavior
 
+		# SElinux gets in the way of older MapR installs (1.2)
+		# as well as MySQL (if we want a non-standard data directory)
+		#	Be sure to disable it IMMEDIATELY for the rest of this 
+		#	process; the change to SELINUX_CONFIG will ensure the 
+		#	change across reboots.
   SELINUX_CONFIG=/etc/selinux/config
-  [ -f $SELINUX_CONFIG ] && \
+  if [ -f $SELINUX_CONFIG ] ; then
 	sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' $SELINUX_CONFIG
+	echo 0 > /selinux/enforce
+  fi
+
 
 	update_ntp_config
 	update_ssh_config
@@ -349,7 +362,20 @@ function install_java() {
 function add_mapr_user() {
 	echo Adding/configuring mapr user >> $LOG
 	id $MAPR_USER &> /dev/null
-	[ $? -eq 0 ] && return $? ;
+	if [ $? -eq 0 ] ; then
+			# If we passed a UID in as meta-data, 
+			# now is the time to make sure it lines up
+			# with the pre-existing account.
+			#	NOTE: we ONLY do this if a UID was passed in
+		target_uid=$(curl -f $murl_attr/mapruid)
+		if [ -n "${target_uid}" -a  `id $MAPR_USER` -ne ${target_uid} ] ; then
+			echo "updating ${MAPR_USER} account to uid ${MAPR_UID}" >> $LOG
+			usermod -u ${target_uid} ${MAPR_USER}
+			groupmod -g ${target_uid} ${MAPR_USER}
+		fi
+
+		return 0 
+	fi
 
 	echo "useradd -u $MAPR_UID -c MapR -m -s /bin/bash" >> $LOG
 	useradd -u $MAPR_UID -c "MapR" -m -s /bin/bash $MAPR_USER 2> /dev/null
