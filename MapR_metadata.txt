@@ -1,0 +1,44 @@
+# Metadata passed in to each instance as they are spun up.
+#
+#	The metadata passed in includes
+#		maprhome : home directory of the software
+#		mapruser : local user for mapr services (account may exist)
+#		maprgroup : (defaults to "user" if not present)
+#		maprpasswd : password for local user
+#			NOTE: the baseline image has mapr:hadoop with password MapR
+#			those will be the defaults, as with MAPR_HOME=/opt/mapr
+#
+#		maprimagerscript   : baseline image creation (just in case)
+#		maprversion   : Version of MapR software; not used at this point
+#		maprpackages  : MapR software packages to be installed
+#		maprlicense   : license key (if available)
+#		cluster : name of this cluster
+#		zknodes : Zookeeper nodes for this cluster
+#		cldbnodes : CLDB nodes for this cluster
+#			NOTE: The script will exit if rational values of these 
+#			are not passed in
+#	
+#		maprnfsserver : node to use for NFS mounting of cluster
+#			Nodes with mapr-nfs as one of the packages to be installed
+#			will automatically mount the localhost:/mapr.  Other client
+#			nodes should have this parameter passed to set up the remote
+#			mount.  This can be a server name or an HA NFS VIP.
+#
+#		maprmetricsserver : node on which the MySQL database with the
+#			metrics instance is configured.  If this script runs on
+#		    that node, the MySQL instance will be initialized.
+#
+#	Additionally, there some values from the Cloud Environment itself
+#	that might be usefule
+#		image : we could confirm that we're launched with a mapr image 
+#
+#
+# Metadata is accessed from a private web service (http://metadata/0.1
+# The top of the tree is
+#	http://metadata/0.1/meta-data
+#
+# The attributes are passed in under meta-data/attributes.
+#
+# Be sure to use curl -f for parameters that might be missing ... otherwise
+# you'll load garbage into the shell variables !!!
+# 
