@@ -238,7 +238,6 @@ function update_os() {
 	echo 0 > /selinux/enforce
   fi
 
-
 	update_ntp_config
 	update_ssh_config
 }
@@ -256,11 +255,19 @@ function install_openjdk_deb() {
     echo "Installing OpenJDK packages (for deb distros)" >> $LOG
 
 	c apt-get install -y x11-utils
-	c apt-get install -y openjdk-7-jdk openjdk-7-doc 
 
-	JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
+		# The GCE Debian 6 image doesn't have a repo enabled for
+		# Java 7 ... stick with Java 6 fo that version
+	deb_version=`cat /etc/debian_version`
+	if [ -n "$deb_version"  -a  "${deb_version%%.*}" = "6" ] ; then
+		c apt-get install -y openjdk-6-jdk openjdk-6-doc 
+		JAVA_HOME=/usr/lib/jvm/java-6-openjdk
+	else
+		c apt-get install -y openjdk-7-jdk openjdk-7-doc 
+		JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
+	fi
 	export JAVA_HOME
-    echo "	JAVA_HOME=$JAVA_HOME" >> $LOG
+	echo "	JAVA_HOME=$JAVA_HOME" >> $LOG
 }
 
 function install_oraclejdk_deb() {
