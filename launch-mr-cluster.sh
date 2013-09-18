@@ -231,6 +231,7 @@ do
     --image=$maprimage \
     --machine_type=$machinetype \
     --zone=$zone \
+	--persistent_boot_disk \
     ${instance_disks[$i]} \
     --metadata_from_file=startup-script:configure-mapr-instance.sh \
     --metadata_from_file=maprimagerscript:prepare-mapr-image.sh \
