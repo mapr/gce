@@ -23,7 +23,7 @@ DIRECTORY CONTENTS
 		configure-mapr-instance.sh (if passed in as metadata).  
 		The goal is to do the initial O/S configuration and enough useful
 		preparation to deliver a stable, consistent base on which
-		to build a full cluster.  
+		to install the MapR software itself.
 
 	configure-mapr-instance.sh : 
 		Configures the MapR software based on meta-data passed in
