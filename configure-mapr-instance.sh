@@ -856,6 +856,35 @@ function retrieve_ssh_keys()
 	done
 }
 
+# Returns 1 if volume comes on line within 5 minutes
+# This is not ideal, but it's the only safe way to add
+# the necessary volumes below without recreating the work
+# of createsystemvolumes.sh
+#
+wait_for_mapr_volume() {
+	VOL=$1
+	VOL_ONLINE=0
+	[ -z "${VOL}" ] && return $VOL_ONLINE
+
+	echo "Waiting for $VOL volume to come on line" >> $LOG
+	i=0
+	while [ $i -lt 300 ] 
+	do
+		maprcli volume info -name $VOL &> /dev/null
+		if [ $? -eq 0 ] ; then
+			echo " ... success !!!" >> $LOG
+			VOL_ONLINE=1
+			i=9999
+			break
+		fi
+
+		sleep 3
+		i=$[i+3]
+	done
+
+	return $VOL_ONLINE
+}
+
 # Enable FullControl for MAPR_USER and install a license (if we have one)
 #
 finalize_mapr_cluster() {
@@ -907,22 +936,8 @@ finalize_mapr_cluster() {
 		# Then create a home directory for the user (since system 
 		# volumes are now alive)
 		#	
-	VAR_ONLINE=0
-	echo "Waiting for mapr.var volume to come on line" >> $LOG
-	i=0
-	while [ $i -lt 300 ] 
-	do
-		maprcli volume info -name mapr.var &> /dev/null
-		if [ $? -eq 0 ] ; then
-			echo " ... success !!!" >> $LOG
-			VAR_ONLINE=1
-			i=9999
-			break
-		fi
-
-		sleep 3
-		i=$[i+3]
-	done
+	wait_for_mapr_volume mapr.var
+	VAR_ONLINE=$?
 
 	if [ ${VAR_ONLINE} -eq 0 ] ; then
 		echo "WARNING: mapr.var volume did not come on-line" >> $LOG
@@ -942,8 +957,12 @@ finalize_mapr_cluster() {
 		fi
 	fi
 
-	maprcli volume info -name users &> /dev/null
-	if [ $? -eq 0 ] ; then
+	wait_for_mapr_volume users
+	USERS_ONLINE=$?
+
+	if [ ${USERS_ONLINE} -eq 0 ] ; then
+		echo "WARNING: user volume did not come on-line" >> $LOG
+	else
 		HOME_VOL=${MAPR_USER}_home
 
 		maprcli volume info -name $HOME_VOL &> /dev/null
