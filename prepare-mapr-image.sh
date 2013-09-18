@@ -123,6 +123,8 @@ function update_os_deb() {
 	c apt-get install -y sysstat
 	apt-get install -y dnsutils
 	apt-get install -y clustershell pdsh realpath
+
+	[ -f /etc/debian_version ] && touch /etc/init.d/.legacy-bootordering
 }
 
 # For CentOS and Fedora, the GCE environment does not support 
@@ -555,20 +557,20 @@ install_mapr_packages() {
 function disable_mapr_services() 
 {
 	echo Temporarily disabling MapR services >> $LOG
-	c mv -f $MAPR_HOME/hostid    $MAPR_HOME/conf/hostid.image
-	c mv -f $MAPR_HOME/hostname  $MAPR_HOME/conf/hostname.image
+	mv -f $MAPR_HOME/hostid    $MAPR_HOME/conf/hostid.image
+	mv -f $MAPR_HOME/hostname  $MAPR_HOME/conf/hostname.image
 
 	if which dpkg &> /dev/null; then
-		c update-rc.d -f mapr-warden remove
+		update-rc.d -f mapr-warden disable
 		echo $MAPR_PACKAGES | grep -q zookeeper
 		if [ $? -eq 0 ] ; then
-			c update-rc.d -f mapr-zookeeper remove
+			update-rc.d -f mapr-zookeeper disable
 		fi
 	elif which rpm &> /dev/null; then
-		c chkconfig mapr-warden off
+		chkconfig mapr-warden off
 		echo $MAPR_PACKAGES | grep -q zookeeper
 		if [ $? -eq 0 ] ; then
-			c chkconfig mapr-zookeeper off
+			chkconfig mapr-zookeeper off
 		fi
 	fi
 }
