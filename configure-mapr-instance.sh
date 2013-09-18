@@ -492,6 +492,12 @@ configure_mapr_services() {
 			${WARDEN_CONF_FILE}
 	fi
 
+		# Bug 11604 ... need to clean-up startup scripts so that
+		# the SysV rc routines handle them properly. 
+	for f in `ls /etc/init.d/mapr-*` ; do
+		mapr_service=`basename $f`
+		sed -i "s/#Provides:[ 	]*MapR .*$/# Provides: $mapr_service/" $f
+	done
 }
 
 # Simple script to add useful parameters to the 
