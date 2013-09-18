@@ -32,7 +32,7 @@ else
 	THIS_HOST=`/bin/hostname`
 fi
 
-THIS_IMAGE=$(curl $murl_attr/image)    # name of initial image loaded here
+THIS_IMAGE=$(curl -f $murl_attr/image)    # name of initial image loaded here
 GCE_PROJECT=$(curl -f $murl_top/project-id) 
 
 MAPR_HOME=$(curl -f $murl_attr/maprhome)	# software installation directory
@@ -1026,7 +1026,7 @@ function main()
 
 		# Most of the time in virtual environments we DO NOT 
 		# want to auto-start ... so we'll control that here.
-	if [ -z "${AMI_IMAGE}" ] ; then
+	if [ -z "${THIS_IMAGE}" ] ; then
 		enable_mapr_services
 	else
 		disable_mapr_services
