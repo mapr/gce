@@ -43,15 +43,34 @@ Ensure that your environment is ready to support GCE deployments
 	- a GCE project exists on which you can deploy instances
 	- gcutil is installed (be sure to download the latest version)
 	- your default GCE credentials are established
+		- use 'gcutil config' to establish the credentials to your GCE account
 
 Use launch-mapr-cluster.sh to create your first cluster :
 	./launch-mapr-cluster.sh \
 		--cluster TestCluster \
-		--node-name MyTest \
-		--mapr-version 2.1.2 \
+		--node-name test \
+		--mapr-version 3.0.1 \
 		--config-file 3node.lst \
-		--image centos-6-v20130723 \
+		--image centos-6-v20130813 \
 		--machine-type n1-standard-2-d"
+
+The output logs from the prepare-* and configure-* scripts will
+be saved to /home/mapr on the instances.   The file 
+/var/log/startupscript.log contains the stdout record from the execution
+of configure-mapr-instance.sh (the script we pass in as the startup script).
+
+
+KNOWN LIMITATIONS
+-----------------
+	- The "node-name" option must begin with a lower case later due
+	  to GCE naming restrictions
+	- There are issues with MapR Version 3.0.1 and the Google Debian 
+	  images.  The software installation fails because the insserv
+	  routine mishandles the /etc/init.d startup scripts for MapR.
+	  Use the CentOS or GCEL images instead (or create your own).
+	- Files passed as metadata during instance startup 
+	  (via `--metadata_from_file="<file>") are limited to 32 kilobytes.
+	  This can be an issue for the configure-mapr-instance script.
 
 
 BACKGROUND READING
