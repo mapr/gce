@@ -447,13 +447,16 @@ function setup_mapr_repo_deb() {
     MAPR_PKG="http://package.mapr.com/releases/v${MAPR_VERSION}/ubuntu"
     MAPR_ECO="http://package.mapr.com/releases/ecosystem/ubuntu"
 
-    [ -f $MAPR_REPO_FILE ] && return ;
-
     echo Setting up repos in $MAPR_REPO_FILE
-    cat > $MAPR_REPO_FILE << EOF_ubuntu
+
+    if [ ! -f $MAPR_REPO_FILE ] ; then
+    	cat > $MAPR_REPO_FILE << EOF_ubuntu
 deb $MAPR_PKG mapr optional
 deb $MAPR_ECO binary/
 EOF_ubuntu
+	else
+		sed -i "s|/releases/v.*/|/releases/v${MAPR_VERSION}/|" $MAPR_REPO_FILE
+	fi
 	
     apt-get update
 }
@@ -463,9 +466,14 @@ function setup_mapr_repo_rpm() {
     MAPR_PKG="http://package.mapr.com/releases/v${MAPR_VERSION}/redhat"
     MAPR_ECO="http://package.mapr.com/releases/ecosystem/redhat"
 
-    [ -f $MAPR_REPO_FILE ] && return ;
-
     echo Setting up repos in $MAPR_REPO_FILE
+
+	if [ -f $MAPR_REPO_FILE ] ; then
+		sed -i "s|/releases/v.*/|/releases/v${MAPR_VERSION}/|" $MAPR_REPO_FILE
+		yum makecache
+		return
+	fi
+
     cat > $MAPR_REPO_FILE << EOF_redhat
 [MapR]
 name=MapR Version $MAPR_VERSION media
