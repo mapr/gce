@@ -1,0 +1,16 @@
+# Basic 1+10node configuration for M7 Deployment
+#	This should be for functional tests only, since the 
+#	absence of multiple zookeepers and CLDB nodes makes the cluster
+#	vulnerable to failure of node0
+#
+node0:zookeeper,cldb,jobtracker,tasktracker,webserver,fileserver,hbase,nfs
+node1:fileserver,hbase,nfs
+node2:fileserver,hbase,nfs
+node3:fileserver,hbase,nfs
+node4:fileserver,hbase,nfs
+node5:fileserver,hbase,nfs
+node6:fileserver,hbase,nfs
+node7:fileserver,hbase,nfs
+node8:fileserver,hbase,nfs
+node9:fileserver,hbase,nfs
+node10:fileserver,hbase,nfs

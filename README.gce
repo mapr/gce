@@ -1,0 +1,184 @@
+DIRECTORY CONTENTS
+------------------
+	launch-mapr-cluster.sh : 
+		High-level script that uses the specifications from a 
+		simple configuration file (see the *.lst examples)
+		to deploy a cluster in your GCE environment.
+
+	*node.lst :
+		Sample configuration files to be used by launch-mapr-cluster.sh
+
+	create-mapr-image.sh : 
+		Creates a virtual instance that can be used as a base image 
+		for later cluster creation.  Using a base image does not save 
+		much time over "install everything at instantiation".  However,
+		you may want to customize a base image (with specific user 
+		accounts, additional non-MapR software, etc).  
+			Details: uses gcutil to create an instance and passes in 
+			the prepare-mapr-image.sh script as the startup process.
+
+	prepare-mapr-image.sh : 
+		Install key dependencies (eg Java) and specified MapR software.  
+		Script is used by create-mapr-image.sh, and by 
+		configure-mapr-instance.sh (if passed in as metadata).  
+		The goal is to do the initial O/S configuration and enough useful
+		preparation to deliver a stable, consistent base on which
+		to install the MapR software itself.
+
+	configure-mapr-instance.sh : 
+		Configures the MapR software based on meta-data passed in
+		to the deployed instance.  
+		
+	launch-mr-cluster.sh (obsolete): 
+		Very simple script to create a multi-node 
+		MapReduce cluster within the GCE environment.  The script
+		takes a limited view of of cluster features (using "masters"
+		and "slaves" rather than leveraging the service-oriented 
+		model of MapR).  
+
+
+GETTING STARTED
+---------------
+Ensure that your environment is ready to support GCE deployments
+	- a GCE project exists on which you can deploy instances
+	- gcutil is installed (be sure to download the latest version)
+	- your default GCE credentials are established
+		- use 'gcutil config' to establish the credentials to your GCE account
+
+Use launch-mapr-cluster.sh to create your first cluster :
+	./launch-mapr-cluster.sh \
+		--cluster TestCluster \
+		--node-name test \
+		--mapr-version 3.0.1 \
+		--config-file 3node.lst \
+		--image centos-6-v20130813 \
+		--machine-type n1-standard-2-d"
+
+The output logs from the prepare-* and configure-* scripts will
+be saved to /home/mapr on the instances.   The file 
+/var/log/startupscript.log contains the stdout record from the execution
+of configure-mapr-instance.sh (the script we pass in as the startup script).
+
+
+KNOWN LIMITATIONS
+-----------------
+	- The "node-name" option must begin with a lower case later due
+	  to GCE naming restrictions
+	- There are issues with MapR Version 3.0.1 and the Google Debian 
+	  images.  The software installation fails because the insserv
+	  routine mishandles the /etc/init.d startup scripts for MapR.
+	  Use the CentOS or GCEL images instead (or create your own).
+	- Files passed as metadata during instance startup 
+	  (via `--metadata_from_file="<file>") are limited to 32 kilobytes.
+	  This can be an issue for the configure-mapr-instance script.
+
+
+BACKGROUND READING
+------------------
+	http://mapr.com/doc/display/MapR/Installing+MapR+Software
+
+
+ADVANCED TOPICS
+---------------
+# Creating a new image for Google Compute with create-mapr-image.sh script
+#	(which invokes prepare-mapr-image.sh on the instantiated virtual machine)
+#
+# A constomized image can be used with the launch-mapr-cluster.sh script,
+# and may simplify non-MapR customizations you wish to make.
+#
+# Be sure that same GCE project has GoogleStorage capacity for you to store
+# the tarballs of the boot images.
+
+
+NOTE:  Skip to Step 5 for most deployments ... no need for generating
+a fixed image with MapR software pre-installed given the capabilities
+of the configure-mapr-instance.sh startup script.
+
+
+Step 0 : Understanding the GCE model
+------------------------------------
+	The scripts take advantage of the Google Compute Engine infrastructure,
+	which allows configuration scripts and other meta-data to be passed
+	in to an instance being launched in the cloud.  You'll want to
+	have the latest gcutil tool installed and configured on your
+	client system.
+
+
+Step 1 : Create a running instance from which to generate MapR base image
+-------------------------------------------------------------------------
+	The create-mapr-image.sh script handles this task.
+	It takes the GCE project as an argument, along with the base image 
+	type (eg Debian-[67] or Centos-6) and the MapR version.   The image 
+	type will come from Google.
+
+	You can ssh in to the instance once it's running and confirm 
+	the proper setup.   The log file from prepare-mapr-image.sh is
+	at /tmp/prepare-mapr-image.log ... so you can validate that the 
+	sofware was installed successfully.
+		NOTE: you will be able to access this running instance
+		via SSH  BEFORE  the prepare-mapr-image.sh script is complete.
+		Be careful not take any action that might disrupt the execution
+		of prepare-mapr-image.sh.  A good sanity check is
+		to watch for the availability of the mapr user and the
+		presence of the /opt/mapr software installation directory.
+
+
+Step 2 : Archive the boot disk of the instance
+----------------------------------------------
+	See https://developers.google.com/compute/docs/images?hl=en 
+	for more details on this step.
+
+	The Google instances have tools to help with this.  On the
+	running instance, use the command
+		sudo python /usr/share/imagebundle/image_bundle.py -r / -o /tmp/ \
+			--log_file=/tmp/MapR_base_image.log
+
+	The resulting image.tar.gz file in /tmp will have a strange name ...
+	rename it to something rational and save it to Google Storage
+		gsutil config
+		gsutil mb gs://<images_bucket>		# make a new bucket
+		gsutil cp /tmp/MapR-2.1.1_trial.image.tar.gz gs://<images_bucket>
+
+			NOTE: The mechanics of who can see which buckets is a little
+			confusing.  I was not able to see the images from the web
+			interface to Google Storage, but my command-line access from
+			the same system was just fine.  
+
+
+Step 3 : Create an image for use in later deployments
+-----------------------------------------------------
+	For our 2.1.1 image, it was as simple as 
+		gcutil --project=<PROJECT_ID> addimage \
+			mapr-211-17042-trial-ubuntu-1204  \
+			gs://<images_bucket>/MapR-2.1.1_trial.image.tar.gz
+
+	NOTE: 
+		For reasons known only to Google, the image name
+		MUST start with a lower case letter.  Trying to name
+		and image "MapR-2.1.1" will fail".
+
+	NOTE: image can be deleted with "gcutil deleteimage" command
+
+
+Step 4 : Test out the instantiation of the instance
+---------------------------------------------------
+	Again for our 2.1.1 image, this was a simple test
+		gcutil --project=<PROJECT_ID>  addinstance \
+			--zone=us-central2-a \
+			--machine_type=n1-standard-2-d \
+			--image="mapr-211-17042-trial-ubuntu-1204" \
+			--wait_until_running \
+			mapr1
+
+
+Step 5 : Test out custom instantiation as done by launch*cluster scripts
+------------------------------------------------------------------------
+	The launch*cluser scripts pass in additional metadata and
+	a startup script to the mapr-<version> image, enabling a
+	single-click installation of an entire cluster.  The cluster image 
+	should work fine with those (see notes in configure-mapr-instance.sh
+	for information on what configuration is expected to be done
+	in prepare-mapr-image.sh vs when the image is instantiated 
+	in a cluster).
+
+

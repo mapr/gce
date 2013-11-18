@@ -1,0 +1,5 @@
+# Single node M5 cluster 
+#
+node1:zookeeper,cldb,jobtracker,webserver,fileserver,tasktracker,nfs,hbase,metrics
+# ALTERNATIVELY 	
+#	node1:single-node

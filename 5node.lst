@@ -1,0 +1,7 @@
+# Sample 5-node M5 cluster (per configuration in MapR Documentation)
+#
+node1:zookeeper,cldb,fileserver,tasktracker,nfs
+node2:zookeeper,cldb,fileserver,tasktracker,nfs,webserver
+node3:zookeeper,fileserver,tasktracker,nfs,webserver
+node4:fileserver,tasktracker,nfs,jobtracker,metrics
+node5:fileserver,tasktracker,nfs,jobtracker,metrics
