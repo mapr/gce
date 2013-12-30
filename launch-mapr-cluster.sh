@@ -53,8 +53,7 @@ usage() {
    "
   echo ""
   echo "EXAMPLES"
-  echo "$0 --cluster TestCluster --mapr-version 2.0.1 --config-file 10node.lst --node-name MyTest --image centos-6-v20130723 --machine-type n1-standard-2-d"
-  echo "$0 --cluster ProdCluster --mapr-version 2.1.3.2 --config-file 3node.lst --node-name prod --image debian-7-wheezy-v20130723 --machine-type n1-highmem-2 --persistent-disks 4x64"
+  echo "$0 --cluster ProdCluster --mapr-version 3.0.2 --config-file 3node.lst --node-name prod --image debian-7-wheezy --machine-type n1-highmem-2 --persistent-disks 4x256"
 }
 
 

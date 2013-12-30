@@ -20,41 +20,45 @@
 # Allow a little time for the network and instantiation processes to settle.
 sleep 3
 
-# Metadata for this installation ... pull out details that we'll need
+# Metadata for this instance ... pull out details that we'll need
 #
-murl_top=http://metadata/0.1/meta-data
-murl_attr="${murl_top}/attributes"
+#	Note: The official release of GCE requires extra HTTP headers to
+#	satisfy the metadata requests.
+#
+murl_top=http://metadata/computeMetadata/v1
+murl_attr="${murl_top}/instance/attributes"
+md_header="X-Google-Metadata-Request: True"
 
-THIS_FQDN=$(curl -f $murl_top/hostname)
+THIS_FQDN=$(curl -H "$md_header" -f $murl_top/instance/hostname)
 if [ -z "${THIS_FQDN}" ] ; then
 	THIS_HOST=${THIS_FQDN/.*/}
 else
 	THIS_HOST=`/bin/hostname`
 fi
 
-THIS_IMAGE=$(curl -f $murl_attr/image)    # name of initial image loaded here
-GCE_PROJECT=$(curl -f $murl_top/project-id) 
+THIS_IMAGE=$(curl -H "$md_header" -f $murl_attr/image)    # name of initial image loaded here
+GCE_PROJECT=$(curl -H "$md_header" -f $murl_top/project/project-id) 
 
-MAPR_HOME=$(curl -f $murl_attr/maprhome)	# software installation directory
+MAPR_HOME=$(curl -H "$md_header" -f $murl_attr/maprhome)	# software installation directory
 MAPR_HOME=${MAPR_HOME:-"/opt/mapr"}
-MAPR_UID=$(curl -f $murl_attr/mapruid)
+MAPR_UID=$(curl -H "$md_header" -f $murl_attr/mapruid)
 MAPR_UID=${MAPR_UID:-"2000"}
-MAPR_USER=$(curl -f $murl_attr/mapruser)
+MAPR_USER=$(curl -H "$md_header" -f $murl_attr/mapruser)
 MAPR_USER=${MAPR_USER:-"mapr"}
-MAPR_GROUP=$(curl -f $murl_attr/maprgroup)
+MAPR_GROUP=$(curl -H "$md_header" -f $murl_attr/maprgroup)
 MAPR_GROUP=${MAPR_GROUP:-"mapr"}
-MAPR_PASSWD=$(curl -f $murl_attr/maprpasswd)
+MAPR_PASSWD=$(curl -H "$md_header" -f $murl_attr/maprpasswd)
 MAPR_PASSWD=${MAPR_PASSWD:-"MapR"}
 
-MAPR_IMAGER_SCRIPT=$(curl -f $murl_attr/maprimagerscript)
-MAPR_VERSION=$(curl $murl_attr/maprversion)
-MAPR_PACKAGES=$(curl -f $murl_attr/maprpackages)
-MAPR_LICENSE=$(curl -f $murl_attr/maprlicense)
-MAPR_NFS_SERVER=$(curl -f $murl_attr/maprnfsserver)
+MAPR_IMAGER_SCRIPT=$(curl -H "$md_header" -f $murl_attr/maprimagerscript)
+MAPR_VERSION=$(curl -H "$md_header" $murl_attr/maprversion)
+MAPR_PACKAGES=$(curl -H "$md_header" -f $murl_attr/maprpackages)
+MAPR_LICENSE=$(curl -H "$md_header" -f $murl_attr/maprlicense)
+MAPR_NFS_SERVER=$(curl -H "$md_header" -f $murl_attr/maprnfsserver)
 
 MAPR_METRICS_DEFAULT=metrics
-MAPR_METRICS_SERVER=$(curl -f $murl_attr/maprmetricsserver)
-MAPR_METRICS_DB=$(curl -f $murl_attr/maprmetricsdb)
+MAPR_METRICS_SERVER=$(curl -H "$md_header" -f $murl_attr/maprmetricsserver)
+MAPR_METRICS_DB=$(curl -H "$md_header" -f $murl_attr/maprmetricsdb)
 MAPR_METRICS_DB=${MAPR_METRICS_DB:-$MAPR_METRICS_DEFAULT}
 
 MAPR_DISKS=""
@@ -63,13 +67,13 @@ MAPR_DISKS_PREREQS="fileserver"
 #	then we MUST find some disks to use and configure them properly 
 #	... otherwise this provisioning script will return an error.
 
-cluster=$(curl -f $murl_attr/cluster)
-zknodes=$(curl -f $murl_attr/zknodes)  
-cldbnodes=$(curl -f $murl_attr/cldbnodes)  
+cluster=$(curl -H "$md_header" -f $murl_attr/cluster)
+zknodes=$(curl -H "$md_header" -f $murl_attr/zknodes)  
+cldbnodes=$(curl -H "$md_header" -f $murl_attr/cldbnodes)  
 
-restore_only=$(curl -f $murl_attr/maprrestore)  
+restore_only=$(curl -H "$md_header" -f $murl_attr/maprrestore)  
 restore_only=${restore_only:-false}
-restore_hostid=$(curl -f $murl_attr/maprhostid)
+restore_hostid=$(curl -H "$md_header" -f $murl_attr/maprhostid)
 
 # A few other directories for our distribution
 MAPR_HADOOP_DIR=${MAPR_HOME}/hadoop/hadoop-0.20.2
@@ -174,11 +178,6 @@ passwdEOF
 		# into the mapr account to simplify connection from the
 		# launch client.
 	MAPR_USER_DIR=`eval "echo ~${MAPR_USER}"`
-#	LAUNCHER_SSH_KEY_FILE=$MAPR_USER_DIR/.ssh/id_launcher.pub
-#	curl ${murl_top}/public-keys/0/openssh-key > $LAUNCHER_SSH_KEY_FILE
-#	if [ $? -eq 0 ] ; then
-#		cat $LAUNCHER_SSH_KEY_FILE >> $MAPR_USER_DIR/.ssh/authorized_keys
-#	fi
 
 		# Enhance the login with rational stuff
     cat >> $MAPR_USER_DIR/.bashrc << EOF_bashrc
@@ -213,7 +212,7 @@ prepare_instance() {
 		echo "Executing imager script;" >> $LOG
 		echo "    see /tmp/prepare-mapr-image.log for details" >> $LOG
 		MAPR_IMAGER_FILE=/tmp/mapr_imager.sh
-		curl $murl_attr/maprimagerscript > $MAPR_IMAGER_FILE
+		curl -H "$md_header" $murl_attr/maprimagerscript > $MAPR_IMAGER_FILE
 		chmod a+x $MAPR_IMAGER_FILE
 		$MAPR_IMAGER_FILE
 		return $?
