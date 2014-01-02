@@ -122,7 +122,7 @@ function update_os_deb() {
 
 	c apt-get install -y syslinux sdparm
 	c apt-get install -y sysstat
-	apt-get install -y dnsutils
+	apt-get install -y dnsutils lsof
 	apt-get install -y clustershell pdsh realpath
 
 	[ -f /etc/debian_version ] && touch /etc/init.d/.legacy-bootordering
