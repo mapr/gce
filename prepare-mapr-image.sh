@@ -440,6 +440,10 @@ set -o vi
 
 EOF_bashrc
 
+		# Add MapR user to sudo group if it exists
+	grep -q -e "^sudo:" /etc/group
+	[ $? -eq 0 ] && usermod -G sudo $MAPR_USER
+
 	return 0
 }
 
