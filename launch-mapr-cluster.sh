@@ -239,6 +239,12 @@ if [ -n "${metricsnode:-}" ] ; then
 	metrics_args="--metadata=maprmetricsserver:${metricsnode:-} --metadata=maprmetricsdb:maprmetrics"
 fi
 
+# Only add license arg if file exists
+if [ -n "${licenseFile}" ] ; then
+	[ -f "${licenseFile}" ] && \
+		license_args='--metadata_from_file=\"maprlicense:${licenseFile}\"' 
+fi
+
 # Add persistent boot arg if necessary
 if [ -n "${pboot}" ] ; then
 	[ "${pboot}" = "true" ] && pboot_args="--persistent_boot_disk"
@@ -277,12 +283,13 @@ set -x
 		--metadata_from_file="maprimagerscript:prepare-mapr-image.sh" \
 		--metadata="maprversion:${maprversion}"  \
 		--metadata="maprpackages:${packages}" \
-		--metadata_from_file="maprlicense:${licenseFile}" \
+		${license_args:-} \
 		${metrics_args:-} \
 		--metadata="cluster:${cluster}" \
 		--metadata="zknodes:${zkhosts}" \
 		--metadata="cldbnodes:${cldbhosts}" \
 		--wait_until_running \
+		--service_account_scopes=storage-full \
     $host &
 done
 
