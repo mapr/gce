@@ -29,24 +29,24 @@
 sleep 10
 
 # Metadata for this installation ... pull out details that we'll need
-# Google Compue Engine allows the create-instance operation to pass
-# in parameters via this mechanism.
-#	TBD : optionally allow MapR user and password to be passed in 
-# 
-murl_top=http://metadata/0.1/meta-data
-murl_attr="${murl_top}/attributes"
+#
+#	Note: The official release of GCE requires extra HTTP headers to
+#	satisfy the metadata requests.
+#
+murl_top=http://metadata/computeMetadata/v1
+murl_attr="${murl_top}/instance/attributes"
+md_header="X-Google-Metadata-Request: True"
 
-THIS_FQDN=$(curl $murl_top/hostname)
-THIS_HOST=${THIS_FQDN/.*/}
-THIS_IMAGE=$(curl $murl_attr/image)    # name of initial image loaded here
-GCE_PROJECT=$(curl -f $murl_top/project-id) 
-MAPR_VERSION=$(curl $murl_attr/maprversion)    # mapr version, eg. 1.2.3
+THIS_FQDN=$(curl -H "$md_header" -f $murl_top/instance/hostname)
+if [ -z "${THIS_FQDN}" ] ; then
+	THIS_HOST=${THIS_FQDN/.*/}
+else
+	THIS_HOST=`/bin/hostname`
+fi
 
-# A comma separated list of packages (without the "mapr-" prefix)
-# to be installed.   This script assumes that NONE of them have 
-# been installed.
-MAPR_PACKAGES=$(curl -f $murl_attr/maprpackages)
-MAPR_PACKAGES=${MAPR_PACKAGES:-"core,fileserver"}
+THIS_IMAGE=$(curl -H "$md_header" -f $murl_attr/image)    # name of initial image loaded here
+GCE_PROJECT=$(curl -H "$md_header" -f $murl_top/project/project-id) 
+
 
 # NOTE: We could be smart and look to see if THIS_IMAGE was a 
 # MapR image, and bail on all the rest of this script.
@@ -54,16 +54,21 @@ MAPR_PACKAGES=${MAPR_PACKAGES:-"core,fileserver"}
 # Definitions for our installation
 #	These should use the same meta-data definitions as the configure-* script
 #
-MAPR_HOME=$(curl -f $murl_attr/maprhome)
+MAPR_HOME=$(curl -H "$md_header" -f $murl_attr/maprhome)	# software installation directory
 MAPR_HOME=${MAPR_HOME:-"/opt/mapr"}
-MAPR_UID=$(curl -f $murl_attr/mapruid)
+MAPR_UID=$(curl -H "$md_header" -f $murl_attr/mapruid)
 MAPR_UID=${MAPR_UID:-"2000"}
-MAPR_USER=$(curl -f $murl_attr/mapruser)
+MAPR_USER=$(curl -H "$md_header" -f $murl_attr/mapruser)
 MAPR_USER=${MAPR_USER:-"mapr"}
-MAPR_GROUP=$(curl -f $murl_attr/maprgroup)
+MAPR_GROUP=$(curl -H "$md_header" -f $murl_attr/maprgroup)
 MAPR_GROUP=${MAPR_GROUP:-"mapr"}
-MAPR_PASSWD=$(curl -f $murl_attr/maprpasswd)
+MAPR_PASSWD=$(curl -H "$md_header" -f $murl_attr/maprpasswd)
 MAPR_PASSWD=${MAPR_PASSWD:-"MapR"}
+
+MAPR_VERSION=$(curl -H "$md_header" -f $murl_attr/maprversion)
+MAPR_VERSION=${MAPR_VERSION:-"3.0.2"}
+MAPR_PACKAGES=$(curl -H "$md_header" -f $murl_attr/maprpackages)
+MAPR_PACKAGES=${MAPR_PACKAGES:-"core,fileserver"}
 
 
 LOG=/tmp/prepare-mapr-image.log
@@ -122,7 +127,7 @@ function update_os_deb() {
 
 	c apt-get install -y syslinux sdparm
 	c apt-get install -y sysstat
-	apt-get install -y dnsutils lsof
+	apt-get install -y dnsutils less lsof
 	apt-get install -y clustershell pdsh realpath
 
 	[ -f /etc/debian_version ] && touch /etc/init.d/.legacy-bootordering
