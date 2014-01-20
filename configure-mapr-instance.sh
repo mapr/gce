@@ -575,16 +575,16 @@ configure_mapr_nfs() {
 		/etc/init.d/nfslock restart
 	fi
 
-	echo "Mounting ${MAPR_NFS_SERVER}:/mapr/$cluster to $MAPR_FSMOUNT" >> $LOG
+	echo "Mounting ${MAPR_NFS_SERVER}:/mapr to $MAPR_FSMOUNT" >> $LOG
 	mkdir $MAPR_FSMOUNT
 
 		# I need to be smarter here about the "restore_only" case
 	if [ $MAPR_NFS_SERVER = "localhost" ] ; then
-		echo "${MAPR_NFS_SERVER}:/mapr/$cluster	$MAPR_FSMOUNT	$MAPR_NFS_OPTIONS" >> $MAPR_FSTAB
+		echo "${MAPR_NFS_SERVER}:/mapr	$MAPR_FSMOUNT	$MAPR_NFS_OPTIONS" >> $MAPR_FSTAB
 
 		maprcli node services -nfs restart -nodes `cat $MAPR_HOME/hostname`
 	else
-		echo "${MAPR_NFS_SERVER}:/mapr/$cluster	$MAPR_FSMOUNT	nfs	$MAPR_NFS_OPTIONS	0	0" >> $SYSTEM_FSTAB
+		echo "${MAPR_NFS_SERVER}:/mapr	$MAPR_FSMOUNT	nfs	$MAPR_NFS_OPTIONS	0	0" >> $SYSTEM_FSTAB
 		mount $MAPR_FSMOUNT
 	fi
 }
@@ -665,7 +665,7 @@ create_metrics_db() {
 		maprcli acl edit -type volume -name mapr.mysql -user mysql:fc
 		if [ $? -eq 0 ] ; then
 				# Now we'll access the DATA_DIR via an NFS mount
-			MYSQL_DATA_DIR=${MAPR_FSMOUNT}${MYSQL_DATA_DIR}
+			MYSQL_DATA_DIR=${MAPR_FSMOUNT}/${cluster}${MYSQL_DATA_DIR}
 
 				# Short wait for NFS client to see newly created volume
 			sleep 5
