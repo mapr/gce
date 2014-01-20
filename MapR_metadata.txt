@@ -33,11 +33,23 @@
 #		image : we could confirm that we're launched with a mapr image 
 #
 #
-# Metadata is accessed from a private web service (http://metadata/0.1
-# The top of the tree is
-#	http://metadata/0.1/meta-data
+# Access to Metadata 
+#	See https://developers.google.com/compute/docs/metadata for 
+#	complete documentation.   
 #
-# The attributes are passed in under meta-data/attributes.
+#	At a simple level, metadata is available within the GCE instances
+#	via a REST interface at http://metadata/computeMetadata/v1/ .   
+#	For security reasons, an additional header is required when 
+#	accessing the values
+#		X-Google-Metadata-Request: True
+#
+# Access to Metadata during GCE Beta
+#	During the Beta of GCE, the metadata was accessed from a private 
+#	web service (http://metadata/0.1) within the instance
+#	The top of the tree was
+#		http://metadata/0.1/meta-data
+#
+#	 The attributes are passed in under meta-data/attributes.
 #
 # Be sure to use curl -f for parameters that might be missing ... otherwise
 # you'll load garbage into the shell variables !!!
