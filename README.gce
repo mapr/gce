@@ -29,6 +29,12 @@ DIRECTORY CONTENTS
 		Configures the MapR software based on meta-data passed in
 		to the deployed instance.  
 		
+	configure-gcs.sh
+		Script to be executed on nodes AFTER successful deployment
+		of the MapR cluster to install and configure Google's
+		Google-Cloud-Storage connector.   
+			TBD: add option to execute this within launch-mapr-cluster.sh
+
 	launch-mr-cluster.sh (obsolete): 
 		Very simple script to create a multi-node 
 		MapReduce cluster within the GCE environment.  The script
