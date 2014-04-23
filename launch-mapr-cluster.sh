@@ -242,7 +242,8 @@ fi
 # Only add license arg if file exists
 if [ -n "${licenseFile}" ] ; then
 	[ -f "${licenseFile}" ] && \
-		license_args='--metadata_from_file=\"maprlicense:${licenseFile}\"' 
+		license_meta="maprlicense:${licenseFile}"
+		license_args="--metadata_from_file=$license_meta"
 fi
 
 # Add persistent boot arg if necessary
