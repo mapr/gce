@@ -9,11 +9,6 @@
 #	The image has ssh public key functionality enabled
 #	The image has ntp installed and running (all cluster nodes see same time)
 #	The image has JAVA installed
-#	The core mapr software is installed (mapr-core) ... but the script
-#		handles the case when it is not
-#	The image may have a mapr user already initialized; the launch
-#		script can override with a new user if necessary
-#			NOTE: the password WILL be updated even if the user already exists !
 #
 # Metadata ... see MapR_metadata.txt
 
@@ -21,9 +16,6 @@
 sleep 3
 
 # Metadata for this instance ... pull out details that we'll need
-#
-#	Note: The official release of GCE requires extra HTTP headers to
-#	satisfy the metadata requests.
 #
 murl_top=http://metadata/computeMetadata/v1
 murl_attr="${murl_top}/instance/attributes"
@@ -100,9 +92,8 @@ fi
 
 # Helper utility to log the commands that are being run and
 # save any errors to a log file
-#	BEWARE : any error forces the script to exit
-#
-#	BE CAREFUL ... c() cannot handle command lines with redirection
+#	BE CAREFUL ... this function cannot handle command lines with
+#	their own redirection.
 
 c() {
     echo $* >> $LOG
@@ -112,16 +103,11 @@ c() {
     }
 }
 
-# Helper utility to update ENV settings in env.sh.
-# Function is replicated in the prepare-mapr-image.sh script.
-# Function WILL NOT override existing settings ... it looks
-# for the default "#export <var>=" syntax and substitutes the new value.
-# It __could__ override existing settings with a trivial change to 
-# the generated awk script.
-#	NOTE: I used awk because sed is too painful for substituting paths.
+# Helper utility to update ENV settings in env.sh (replicated in 
+# prepare-mapr-image.sh).  WILL NOT override existing settings
 #
 MAPR_ENV_FILE=$MAPR_HOME/conf/env.sh
-update-env-sh()
+function update-env-sh()
 {
 	[ -z "${1:-}" ] && return 1
 	[ -z "${2:-}" ] && return 1
@@ -223,17 +209,11 @@ prepare_instance() {
 
 
 # Takes the packages defined by MAPR_PACKAGES and makes sure
-# that those (and only those) pieces of MapR software are installed.
-# The idea is that a single image with EXTRA packages could still 
-# be used, and the extraneous packages would just be removed.
-# 	NOTE: We're careful not to remove mapr-core or -internal packages.
+# that those (and only those) are installed.
 #
 #	Input: MAPR_PACKAGES  (global)
 #
 install_mapr_packages() {
-	#
-	#  If no MapR software packages are specified, BAIL OUT NOW !!!
-	#
 	if [ -z "${MAPR_PACKAGES:-}" ] ; then
 		echo "No MapR software specified ... terminating script" >> $LOG
 		return 1
@@ -254,8 +234,6 @@ install_mapr_packages() {
 	done
 
 		# Be careful about removing -core or -internal packages
-		# Never remove "core", and remove "-internal" only if we 
-		# remove the parent as well (that logic is not yet implemented).
 	MAPR_TO_REMOVE=""
 	for pkg in $MAPR_INSTALLED
 	do
@@ -289,9 +267,7 @@ install_mapr_packages() {
 	return 0
 }
 
-# Logic to search for unused disks and initialize the MAPR_DISKS
-# parameter for use by the disksetup utility.  Anything that doesn't
-# have a partition table or swap info is eligible.
+# Locate unused disks; save to MAPR_DISKS env variable.
 #
 find_mapr_disks() {
 	disks=""
@@ -321,14 +297,9 @@ find_mapr_disks() {
 }
 
 #
-# For most installations, we'll just look for unused disks
-# Optionally, the MAPR_DISKS setting can be passed in as 
-# meta data to override the search.
+# Format disks (discovered or passed in as MAPR_DISKS) for MapR
 #
 provision_mapr_disks() {
-		# If we're restoring the node, regenerate the disktab
-		# if necessary and go on.
-
 	diskfile=/tmp/MapR.disks
 	disktab=$MAPR_HOME/conf/disktab
 	rm -f $diskfile
@@ -365,16 +336,8 @@ provision_mapr_disks() {
 	fi
 }
 
-# Several identity files may need to be updated if this
-# instance was created from an image file.  Alternatively,
-# nodes being redeployed to the same cluster SHOULD NOT 
-# rebuild those identity files.
+# Update MapR host identity files if necessary.
 configure_host_identity() {
-		#
-		# hostid is created when mapr-core is installed, which
-		# could have been from the image file used to create
-		# this instance.
-		#
 	if [ "${restore_only}" = "true" ] ; then
 		if [ -n "${restore_hostid}" ] ; then
 			echo $restore_hostid > $MAPR_HOME/hostid
@@ -396,6 +359,7 @@ configure_host_identity() {
 			echo "Cannot find valid hostname. Please check your DNS settings" >> $LOG
 		fi
 	fi
+
 }
 
 
@@ -473,12 +437,7 @@ configure_mapr_services() {
 	MFS_CONF_FILE=${MAPR_HOME}/conf/mfs.conf
 	WARDEN_CONF_FILE=${MAPR_HOME}/conf/warden.conf
 
-# Additional customizations of MapR installation ... to be done based
-# on instance type and other deployment details.   This is only
-# necessary if the default configuration files from configure.sh
-# are sub-optimal for Cloud deployments.  Some examples might be:
-
-# 	give MFS more memory -- only on slaves, not on masters
+# 	give MFS more memory -- generally not necessary for MapR 3.0 and later
 #sed -i 's/service.command.mfs.heapsize.percent=.*$/service.command.mfs.heapsize.percent=35/' $MFS_CONF_FILE
 
 #	give CLDB more threads 
@@ -569,6 +528,16 @@ configure_mapr_nfs() {
 		# Bail out now if there's not NFS server (either local or remote)
 	[ -z "${MAPR_NFS_SERVER:-}" ] && return 0
 
+		# Performance tune for NFS client on fast networks
+	sysctl -w sunrpc.tcp_slot_table_entries=128
+	if [ -d /etc/modprobe.d ] ; then
+		SUNRPC_CONF=/etc/modprobe.d/sunrpc.conf
+		grep -q tcp_slot_table_entries $SUNRPC_CONF  2> /dev/null
+		if [ $? -ne 0 ] ; then
+			echo "options sunrpc tcp_slot_table_entries=128" >> $SUNRPC_CONF
+		fi
+	fi
+
 		# For RedHat distros, we need to start up NFS services
 	if which rpm &> /dev/null; then
 		/etc/init.d/rpcbind restart
@@ -654,7 +623,7 @@ create_metrics_db() {
 		# be established earlier in the system setup
 		# Given that MySQL CANNOT use MFS if it is enabled, we default
 		# to NOT using MFS unless we're SURE SELINUX is disabled.
-	seState=`cat /selinux/enforce`
+	[ -r /selinux/enforce ] && seState=`cat /selinux/enforce`
 	[ -f /etc/selinux/config  -a  ${seState:-1} -eq 1 ] && useMFS=0
 
 	if [ $useMFS -eq 1 ] ; then
@@ -709,8 +678,8 @@ innodb_data_file_path=ibdata1:10M:autoextend:max:1024M" $MYCNF
 	fi
 
 		# Startup MySQL so the rest of this stuff will work
-	[ -x /etc/init.d/mysql ]   &&  /etc/init.d/mysql  start
-	[ -x /etc/init.d/mysqld ]  &&  /etc/init.d/mysqld start
+	[ -x /etc/init.d/mysql ]   &&  service mysql  start
+	[ -x /etc/init.d/mysqld ]  &&  service mysqld start
 
 		# At this point, we can customize the MySQL installation 
 		# as needed.   For now, we'll just enable multiple connections
@@ -775,6 +744,32 @@ function enable_mapr_services()
 	fi
 }
 
+function wait_for_user_ticket()
+{
+	grep -q "secure=true" $MAPR_HOME/conf/mapr-clusters.conf
+	if [ $? -ne 0 ] ; then
+		return
+	fi
+
+	USERTICKET=${MAPR_HOME}/conf/mapruserticket
+
+	TICKET_WAIT=300
+
+	SWAIT=$TICKET_WAIT
+	STIME=3
+	test -r $USERTICKET
+	while [ $? -ne 0  -a  $SWAIT -gt 0 ] ; do
+		sleep $STIME
+		SWAIT=$[SWAIT - $STIME]
+		test -r $USERTICKET
+	done
+
+	if [ -r $USERTICKET ] ; then
+		MAPR_TICKETFILE_LOCATION=${USERTICKET}
+		export MAPR_TICKETFILE_LOCATION
+	fi
+}
+
 function start_mapr_services() 
 {
 	echo "Starting MapR services" >> $LOG
@@ -791,14 +786,23 @@ function start_mapr_services()
 	fi
 
 		# This is as logical a place as any to wait for HDFS to
-		# come on line
+		# come on line.  If security is enabled, we need to wait
+		# a few minutes for the user ticket to be generated FIRST
+	grep -q "secure=true" $MAPR_HOME/conf/mapr-clusters.conf
+	if [ $? -eq 0 ] ; then
+		wait_for_user_ticket	
+	fi
+
+		# We REALLY need java_home set here
+	[ -f /etc/profile.d/javahome.sh ]  && . /etc/profile.d/javahome.sh
+
 	HDFS_ONLINE=0
 	HDFS_MAX_WAIT=600
 	echo "Waiting for hadoop file system to come on line" | tee -a $LOG
 	i=0
 	while [ $i -lt $HDFS_MAX_WAIT ] 
 	do
-		hadoop fs -stat /  2> /dev/null
+		hadoop fs -stat /  &> /dev/null
 		if [ $? -eq 0 ] ; then
 			curTime=`date`
 			echo " ... success at $curTime !!!" | tee -a $LOG
@@ -816,9 +820,9 @@ function start_mapr_services()
 	if [ ${HDFS_ONLINE} -eq 0 ] ; then
 		echo "ERROR: MapR File Services did not come on-line" >> $LOG
 		return 1
-	else
-		return 0
 	fi
+
+	return 0
 }
 
 # Look to the cluster for shared ssh keys.  This function depends
@@ -855,16 +859,14 @@ function retrieve_ssh_keys()
 		if [ ! -f ${MAPR_USER_DIR}/.ssh/$kf ] ; then
 			hadoop fs -get ${kdir}/${kf} ${MAPR_USER_DIR}/.ssh/$kf
 			cat ${MAPR_USER_DIR}/.ssh/$kf >> ${akFile}
-			chown --reference=${MAPR_USER_DIR}/.bashrc \
+			chown --reference=${MAPR_USER_DIR} \
 				${MAPR_USER_DIR}/.ssh/$kf ${akFile}
 		fi
 	done
 }
 
 # Returns 1 if volume comes on line within 5 minutes
-# This is not ideal, but it's the only safe way to add
-# the necessary volumes below without recreating the work
-# of createsystemvolumes.sh
+# Need this functionality to ensure proper addition of our new volumes.
 #
 wait_for_mapr_volume() {
 	VOL=$1
@@ -1009,19 +1011,56 @@ function main()
 
 	configure_host_identity 
 
-		# Waiting for the nodes at this point SHOULD be unnecessary,
-		# since we had to have the node alive to get to this part
-		# of the script.  So we can just do the configuration
+		# Prepare to configure the node, supporting version-specific options
+	major_ver=${MAPR_VERSION%%.*}
+	ver=${MAPR_VERSION#*.}
+	minor_ver=${ver%%.*}
+	MVER=${major_ver}${minor_ver}   # Simpler representation ... 3.1.0 => 31
+
 	[ -n "${THIS_IMAGE}" ] && VMARG="--isvm"
-	if [ ${MAPR_VERSION%%.*} -ge 3 ] ; then
+	if [ ${MVER} -ge 30 ] ; then
 		if [ "${MAPR_VERSION}" != "3.0.0-GA" ] ; then
 			echo $MAPR_PACKAGES | grep -q hbase
 			[ $? -eq 0 ] && M7ARG="-M7"
+			if [ -z "${M7ARG:-}"  -a  ${#MAPR_LICENSE} -gt 0 ] ; then
+				echo ${MAPR_LICENSE} | grep -q MAPR_TABLES
+				[ $? -eq 0 ] && M7ARG="-M7"
+			fi
 		fi
 	fi
 
-	c $MAPR_HOME/server/configure.sh -N $cluster -C $cldbnodes -Z $zknodes \
-	    -u $MAPR_USER -g $MAPR_GROUP $M7ARG $VMARG
+	if [ $MVER -ge 31 ] ; then
+		if [ "${MAPR_SECURITY:-}" = "master" ] ; then
+			SECARG="-secure -genkeys"
+		elif [ "${MAPR_SECURITY:-}" = "enabled" ] ; then
+			SECARG="-secure"
+
+				# If security is "enabled", but no SEC_MASTER, 
+				# override setting here
+			if [ -z "${MAPR_SEC_MASTER}" ] ; then
+				SECARG="-unsecure"
+			elif [ "${MAPR_SEC_MASTER%%.*}" = "$THIS_HOST" ] ; then
+				SECARG="-secure -genkeys"
+			else
+				retrieve_mapr_security_credentials
+				[ $? -ne 0 ] && SECARG="-unsecure"
+					# TBD : should handle this error better
+			fi
+		else
+			SECARG="-unsecure"
+		fi
+		AUTOSTARTARG="-f -no-autostart -on-prompt-cont y"
+		verbose_flag="-v"
+	fi
+
+		# Waiting for the nodes at this point SHOULD be unnecessary,
+		# since we had to have the node alive to re-spawn this part
+		# of the script.  So we can just do the configuration
+	c $MAPR_HOME/server/configure.sh \
+		$verbose_flag \
+		-N $cluster -C $cldbnodes -Z $zknodes \
+	    -u $MAPR_USER -g $MAPR_GROUP \
+		$M7ARG $AUTOSTARTARG $SECARG $VMARG
 
 	configure_mapr_metrics
 	configure_mapr_services

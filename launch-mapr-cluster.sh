@@ -41,20 +41,19 @@ usage() {
     $PROGRAM
        --project <GCE Project>
        --cluster <clustername>
-       --mapr-version <version, eg 2.1.3, 3.0.1>
-	   --config-file <cfg-file>
+       --mapr-version <version, eg 3.0.1, 3.1.0, 4.0.0>
+       --config-file <cfg-file>
        --image image_name
        --machine-type <machine-type>
+       --persistent-disks <nxm>         # N disks of M gigabytes 
        --zone gcutil-zone
        [ --node-name <name-prefix>      # hostname prefix for cluster nodes ]
        [ --persistent-boot [TRUE|false] # persistent storage for boot device ]
-       [ --persistent-disks <nxm>       # N disks of M gigabytes ]
        [ --license-file <license to be installed> ]
    "
   echo ""
   echo "EXAMPLES"
-  echo "$0 --cluster TestCluster --mapr-version 2.0.1 --config-file 10node.lst --node-name MyTest --image centos-6-v20130723 --machine-type n1-standard-2-d"
-  echo "$0 --cluster ProdCluster --mapr-version 2.1.3.2 --config-file 3node.lst --node-name prod --image debian-7-wheezy-v20130723 --machine-type n1-highmem-2 --persistent-disks 4x64"
+  echo "$0 --cluster ProdCluster --mapr-version 3.0.2 --config-file 3node.lst --node-name prod --image debian-7-wheezy --machine-type n1-highmem-2 --persistent-disks 4x256"
 }
 
 
@@ -134,12 +133,13 @@ do
   esac
   shift 2
 done
+echo ""
 
 
 # Defaults
 project=${project:-"maprtt"}
-maprversion=${maprversion:-"2.1.3.2"}
-machinetype=${machinetype:-"n1-standard-2-d"}
+maprversion=${maprversion:-"3.1.0"}
+machinetype=${machinetype:-"n1-standard-2"}
 zone=${zone:-"us-central1-b"}
 licenseFile=${licenseFile:-"/Users/dtucker/Documents/MapR/licenses/LatestDemoLicense-M5.txt"}
 pboot=${pboot:-"true"}
@@ -147,8 +147,16 @@ pboot=${pboot:-"true"}
 if [ -n "${image:-}" ] ; then
 	maprimage=$image
 else
-	echo "No image specified; aborting cluster creation"
+	echo "ERROR: No image specified; aborting cluster creation"
 	exit 1
+fi
+
+if [ "${machinetype%-d}" = "${machinetype}" ] ; then
+	if [ -z "${pdisk:-}" ] ; then
+		echo "ERROR: No persistent disks specified for diskless machine type ($machinetype);"
+		echo "       aborting cluster creation"
+		exit 1
+	fi
 fi
 
 # If the image has "mapr" in it, we'll assume it's in our project;
@@ -240,6 +248,12 @@ if [ -n "${metricsnode:-}" ] ; then
 	metrics_args="--metadata=maprmetricsserver:${metricsnode:-} --metadata=maprmetricsdb:maprmetrics"
 fi
 
+# Only add license arg if file exists
+if [ -n "${licenseFile}" ] ; then
+	[ -f "${licenseFile}" ] && \
+		license_args="--metadata_from_file=maprlicense:${licenseFile}" 
+fi
+
 # Add persistent boot arg if necessary
 if [ -n "${pboot}" ] ; then
 	[ "${pboot}" = "true" ] && pboot_args="--persistent_boot_disk"
@@ -251,7 +265,6 @@ fi
 grep ^$NODE_NAME_ROOT $configFile | \
 while read hostline
 do
-set -x
 	host="${hostline%:*}"
 	packages="${hostline#*:}"
 
@@ -278,12 +291,13 @@ set -x
 		--metadata_from_file="maprimagerscript:prepare-mapr-image.sh" \
 		--metadata="maprversion:${maprversion}"  \
 		--metadata="maprpackages:${packages}" \
-		--metadata_from_file="maprlicense:${licenseFile}" \
+		${license_args:-} \
 		${metrics_args:-} \
 		--metadata="cluster:${cluster}" \
 		--metadata="zknodes:${zkhosts}" \
 		--metadata="cldbnodes:${cldbhosts}" \
 		--wait_until_running \
+		--service_account_scopes=storage-full \
     $host &
 done
 

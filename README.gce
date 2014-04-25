@@ -5,6 +5,14 @@ DIRECTORY CONTENTS
 		simple configuration file (see the *.lst examples)
 		to deploy a cluster in your GCE environment.
 
+	relaunch-mapr-cluster.sh : 
+		High-level script to respawn the instances deployed with
+		launch-mapr-cluster.sh for a MapR instance.  This is 
+		necessary since the current Google Cloud (Apr 2014) does
+		not have the concept of "stop" and "restart" for instances;
+		you much delete and relaunch instances with the same
+		persisitent storage created during the initial launch.
+
 	*node.lst :
 		Sample configuration files to be used by launch-mapr-cluster.sh
 
@@ -77,6 +85,12 @@ KNOWN LIMITATIONS
 	- Files passed as metadata during instance startup 
 	  (via `--metadata_from_file="<file>") are limited to 32 kilobytes.
 	  This can be an issue for the configure-mapr-instance script.
+
+
+SUPPORT
+-------
+	Support for these scripts is available at answers.mapr.com or
+	via e-mail to support@mapr.com .
 
 
 BACKGROUND READING
