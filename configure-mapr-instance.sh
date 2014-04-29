@@ -529,6 +529,19 @@ configure_mapr_nfs() {
 	[ -z "${MAPR_NFS_SERVER:-}" ] && return 0
 
 		# Performance tune for NFS client on fast networks
+	SYSCTL_CONF=/etc/sysctl.conf
+	echo "#"                >> $SYSCTL_CONF
+	echo "# MapR NFS tunes" >> $SYSCTL_CONF
+	echo "#"                >> $SYSCTL_CONF
+
+	vmopts="vm.dirty_ratio=10"
+	vmopts="$vmopts vm.dirty_background_ratio=4"
+	for vmopt in $vmopts
+	do
+		echo $vmopt >> $SYSCTL_CONF
+		sysctl -w $vmopt
+	done
+
 	sysctl -w sunrpc.tcp_slot_table_entries=128
 	if [ -d /etc/modprobe.d ] ; then
 		SUNRPC_CONF=/etc/modprobe.d/sunrpc.conf
