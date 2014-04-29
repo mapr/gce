@@ -149,7 +149,7 @@ while [ $running_instances -ne 0 ]
 do
 	sleep 10
 	running_instances=`gcutil listinstances --project=$project --zone=$zone \
-		--format=names --filter="name eq .*${cluster}[0-9]+") | wc -l`
+		--format=names --filter="name eq .*${nodeName}[0-9]+") | wc -l`
 done
 
 # Then, add them back
