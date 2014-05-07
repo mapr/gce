@@ -563,6 +563,7 @@ configure_mapr_nfs() {
 		# I need to be smarter here about the "restore_only" case
 	if [ $MAPR_NFS_SERVER = "localhost" ] ; then
 		echo "${MAPR_NFS_SERVER}:/mapr	$MAPR_FSMOUNT	$MAPR_NFS_OPTIONS" >> $MAPR_FSTAB
+		chmod a+r $MAPR_FSTAB
 
 		maprcli node services -nfs restart -nodes `cat $MAPR_HOME/hostname`
 	else
