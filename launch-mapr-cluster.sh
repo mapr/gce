@@ -41,7 +41,7 @@ usage() {
     $PROGRAM
        --project <GCE Project>
        --cluster <clustername>
-       --mapr-version <version, eg 3.0.1, 3.1.0, 4.0.0>
+       --mapr-version <version, eg 3.0.3, 3.1.0, 4.0.0>
        --config-file <cfg-file>
        --image image_name
        --machine-type <machine-type>
@@ -53,7 +53,7 @@ usage() {
    "
   echo ""
   echo "EXAMPLES"
-  echo "$0 --cluster ProdCluster --mapr-version 3.0.2 --config-file 3node.lst --node-name prod --image debian-7-wheezy --machine-type n1-highmem-2 --persistent-disks 4x256"
+  echo "$0 --cluster ProdCluster --mapr-version 3.0.3 --config-file 3node.lst --node-name prod --image debian-7-wheezy --machine-type n1-highmem-2 --persistent-disks 4x256"
 }
 
 
