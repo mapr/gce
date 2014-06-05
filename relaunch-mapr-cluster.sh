@@ -31,7 +31,7 @@ usage() {
        --machine-type <machine-type>
        --zone gcutil-zone
        --node-name <name-prefix>    # hostname prefix for cluster nodes 
-       [ --cluster <clustername>    # unnecessary, but included for parallelism
+       [ --cluster <clustername> ]  # unnecessary, but included for parallelism
    "
   echo ""
   echo "EXAMPLES"
@@ -46,10 +46,15 @@ list_cluster_nodes() {
 	for n in $(gcutil listinstances --project=$project \
 		--format=names --filter="name eq .*${clstr}[0-9]+" | sort) 
 	do
-		[ -z $zone ] && zone=${n%%/*}
 		nodename=`basename $n`
 
-		cluster_nodes="${cluster_nodes} $nodename"
+			# A bit of a kludge to make sure we only work
+			# on OUR cluster nodes ... and it still can fail 
+			# if there is a "MapR" and a "MapRTech" cluster
+		if [ ${nodename#${clstr}} != ${nodename} ] ; then 
+			[ -z $zone ] && zone=${n%%/*}
+			cluster_nodes="${cluster_nodes} $nodename"
+		fi
  	done
 
 	export cluster_nodes
@@ -119,7 +124,7 @@ echo "  machine $machinetype"
 echo "  node-name ${nodeName:-none}"
 echo -----
 echo ""
-echo "NODES: ---- (all instances will be deleted and relaunched)"
+echo "NODES: ---- (all instances will be deleted and relaunched in zone $zone)"
 echo "  $cluster_nodes"
 echo ""
 
@@ -149,7 +154,7 @@ while [ $running_instances -ne 0 ]
 do
 	sleep 10
 	running_instances=`gcutil listinstances --project=$project --zone=$zone \
-		--format=names --filter="name eq .*${nodeName}[0-9]+") | wc -l`
+		--format=names --filter="name eq .*${nodeName}[0-9]+" | wc -l`
 done
 
 # Then, add them back
@@ -173,4 +178,4 @@ done
 wait
 
 echo ""
-echo "$nodeName nodes restarted; cluster ${cluster:-unknown} relaunched !!!"
+echo "$nodeName nodes restarted; cluster ${cluster:-${nodeName}} relaunched !!!"
