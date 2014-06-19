@@ -122,7 +122,6 @@ if [ -n "${pdisk:-}" ] ; then
 		echo " Delete persistent data volumes (pdisk)"
 		delete_persistent_data_disks $host
 	fi
-
 done
 
 wait
