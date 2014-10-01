@@ -55,28 +55,24 @@ MAPR_METRICS_DB=${MAPR_METRICS_DB:-$MAPR_METRICS_DEFAULT}
 
 MAPR_DISKS=""
 MAPR_DISKS_PREREQS="fileserver"
-#	if the PREREQ packages (comma-separated list) are installed, 
-#	then we MUST find some disks to use and configure them properly 
-#	... otherwise this provisioning script will return an error.
+#	PREREQ packages require available raw disks
 
 cluster=$(curl -H "$md_header" -f $murl_attr/cluster)
 zknodes=$(curl -H "$md_header" -f $murl_attr/zknodes)  
 cldbnodes=$(curl -H "$md_header" -f $murl_attr/cldbnodes)  
+rmnodes=$(curl -H "$md_header" -f $murl_attr/rmnodes)  
+hsnode=$(curl -H "$md_header" -f $murl_attr/hsnode)  
 
 restore_only=$(curl -H "$md_header" -f $murl_attr/maprrestore)  
 restore_only=${restore_only:-false}
 restore_hostid=$(curl -H "$md_header" -f $murl_attr/maprhostid)
-
-# A few other directories for our distribution
-MAPR_HADOOP_DIR=${MAPR_HOME}/hadoop/hadoop-0.20.2
 
 LOG=/tmp/configure-mapr-instance.log
 
 # Make sure sbin tools are in PATH
 PATH=/sbin:/usr/sbin:$PATH
 
-# Identify the install command, since we'll do it a lot.
-# If we don't find something rational, bail out
+# Identify the install command; bail out if we can't find something
 if which dpkg &> /dev/null  ; then
 	INSTALL_CMD="apt-get install -y --force-yes"
 	UNINSTALL_CMD="apt-get purge -y --force-yes"
@@ -90,10 +86,8 @@ else
 fi
 
 
-# Helper utility to log the commands that are being run and
-# save any errors to a log file
-#	BE CAREFUL ... this function cannot handle command lines with
-#	their own redirection.
+# Helper utility to log the commands that are being run 
+#	BE CAREFUL ... function does handle command lines with redirection
 
 c() {
     echo $* >> $LOG
@@ -185,8 +179,7 @@ EOF_bashrc
 	return 0
 }
 
-# If there's no mapr software installed, use imager script
-# to do our initial setup.  Exit on failure
+# Use imager script to do our initial setup.  Exit on failure
 prepare_instance() {
 	if [ ! -d ${MAPR_HOME} ] ; then
 		if [ -z "${MAPR_IMAGER_SCRIPT}" ] ; then
@@ -211,8 +204,6 @@ prepare_instance() {
 # Takes the packages defined by MAPR_PACKAGES and makes sure
 # that those (and only those) are installed.
 #
-#	Input: MAPR_PACKAGES  (global)
-#
 install_mapr_packages() {
 	if [ -z "${MAPR_PACKAGES:-}" ] ; then
 		echo "No MapR software specified ... terminating script" >> $LOG
@@ -233,14 +224,16 @@ install_mapr_packages() {
 		MAPR_REQUIRED="$MAPR_REQUIRED mapr-${pkg#mapr-}"
 	done
 
-		# Be careful about removing -core or -internal packages
+		# Be careful about removing -core, -mapreduce, or -internal packages
 	MAPR_TO_REMOVE=""
 	for pkg in $MAPR_INSTALLED
 	do
-		if [ ${pkg%-core} = $pkg  -a  ${pkg%-internal} = $pkg ] ; then
-			echo $MAPR_REQUIRED | grep -q $pkg
-			[ $? -ne 0 ] && MAPR_TO_REMOVE="$MAPR_TO_REMOVE $pkg"
-		fi
+		[ ${pkg%-core} != $pkg ] && continue
+		[ ${pkg%-internal} != $pkg ] && continue
+		[ ${pkg%-mapreduce?} != $pkg ] && continue
+
+		echo $MAPR_REQUIRED | grep -q $pkg
+		[ $? -ne 0 ] && MAPR_TO_REMOVE="$MAPR_TO_REMOVE $pkg"
 	done
 
 	MAPR_TO_INSTALL=""
@@ -296,7 +289,6 @@ find_mapr_disks() {
 	export MAPR_DISKS
 }
 
-#
 # Format disks (discovered or passed in as MAPR_DISKS) for MapR
 #
 provision_mapr_disks() {
@@ -389,13 +381,11 @@ configure_mapr_metrics() {
 
 	echo "Configuring task metrics connection" >> $LOG
 
-	# If the metrics server is specified, make sure the
-	# metrics package is installed on every job tracker and 
-	# webserver system ; otherwise, we'll just skip this step
+	# If the metrics server is specified, mapr-metrics must be
+	# installed on every job tracker and webserver system 
 	#
-	#	NOTE: while it is unlikely that the METRICS_SERVER will
-	#	have been specified WITHOUT the metrics package selected,
-	#	we'll check for that case as well at this point.
+	#	NOTE: also handle the unlikely case that the METRICS_SERVER 
+	#	is specified WITHOUT the metrics package selected
 	if [ ! -f $MAPR_HOME/roles/metrics ] ; then
 		installMetrics=0
 		[ $MAPR_METRICS_SERVER == $THIS_HOST ] && installMetrics=1
@@ -418,13 +408,6 @@ configure_mapr_metrics() {
 		-du $MAPR_USER -dp $MAPR_PASSWD -ds $MAPR_METRICS_DB
 	echo "   configure.sh returned $?" >> $LOG
 
-		# Additional configuration required on WebServer nodes for MapR 1.x
-		# Need to specify the connection metrics in the hibernate CFG file
-		# Version 2 and beyond handles that configuration in configure.sh
-	if [ -f $MAPR_HOME/roles/webserver  -a  ${MAPR_VERSION%%.*} = "1" ] ; then
-		HIBCFG=$MAPR_HOME/conf/hibernate.cfg.xml
-			# TO BE DONE ... fix database properties 
-	fi
 }
 
 
@@ -437,14 +420,7 @@ configure_mapr_services() {
 	MFS_CONF_FILE=${MAPR_HOME}/conf/mfs.conf
 	WARDEN_CONF_FILE=${MAPR_HOME}/conf/warden.conf
 
-# 	give MFS more memory -- generally not necessary for MapR 3.0 and later
-#sed -i 's/service.command.mfs.heapsize.percent=.*$/service.command.mfs.heapsize.percent=35/' $MFS_CONF_FILE
-
-#	give CLDB more threads 
-# sed -i 's/cldb.numthreads=10/cldb.numthreads=40/' $CLDB_CONF_FILE
-
-		# Disable central configuration (spinning up Java processes
-		# every 5 minutes doesn't help; we'll run it on our own)
+		# Disable central configuration 
 	if [ -w $WARDEN_CONF_FILE ] ; then
 		sed -i 's/centralconfig.enabled=true/centralconfig.enabled=false/' \
 			${WARDEN_CONF_FILE}
@@ -466,7 +442,15 @@ configure_mapr_services() {
 update_site_config() {
 	echo "Updating site configuration files" >> $LOG
 
-	HADOOP_CONF_DIR=${MAPR_HADOOP_DIR}/conf
+		# Default hadoop version changed with 4.x
+	if [ ${MAPR_VERSION%%.*} -le 3 ] ; then
+		HADDOP_HOME=${MAPR_HOME}/hadoop/hadoop-0.20.2
+		HADOOP_CONF_DIR=${HADOOP_HOME}/conf
+	else
+		HADOOP_HOME="$(ls -d /opt/mapr/hadoop/hadoop-2*)"
+		HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
+	fi
+
 	MAPRED_CONF_FILE=${HADOOP_CONF_DIR}/mapred-site.xml
 	CORE_CONF_FILE=${HADOOP_CONF_DIR}/core-site.xml
 
@@ -485,7 +469,6 @@ update_site_config() {
 }
 
 
-#
 #  Wait until DNS can find all the zookeeper nodes
 #	TBD: put a timeout ont this ... it's not a good design to wait forever
 #
@@ -839,46 +822,6 @@ function start_mapr_services()
 	return 0
 }
 
-# Look to the cluster for shared ssh keys.  This function depends
-# on the cluster being up and happy.  Don't worry about errors
-# here, this is just a helper function
-function retrieve_ssh_keys() 
-{
-	echo "Retrieving ssh keys for other cluster nodes" >> $LOG
-
-	MAPR_USER_DIR=`eval "echo ~${MAPR_USER}"`
-	clusterKeyDir=/cluster-info/keys
-
-	hadoop fs -stat ${clusterKeyDir}
-	[ $? -ne 0 ] && return 0
-
-	kdir=$clusterKeyDir
-		
-		# Copy root keys FIRST ... since the MapR user keys are 
-		# more important (and we want to give more time)
-	akFile=/root/.ssh/authorized_keys
-	for kf in `hadoop fs -ls ${kdir} | grep ${kdir} | grep _root | awk '{print $NF}' | sed "s_${kdir}/__g"`
-	do
-		echo "  found $kf"
-		if [ ! -f /root/.ssh/$kf ] ; then
-			hadoop fs -get ${kdir}/${kf} /root/.ssh/$kf
-			cat /root/.ssh/$kf >> ${akFile}
-		fi
-	done
-
-	akFile=${MAPR_USER_DIR}/.ssh/authorized_keys
-	for kf in `hadoop fs -ls ${kdir} | grep ${kdir} | grep _${MAPR_USER} | awk '{print $NF}' | sed "s_${kdir}/__g"`
-	do
-		echo "  found $kf"
-		if [ ! -f ${MAPR_USER_DIR}/.ssh/$kf ] ; then
-			hadoop fs -get ${kdir}/${kf} ${MAPR_USER_DIR}/.ssh/$kf
-			cat ${MAPR_USER_DIR}/.ssh/$kf >> ${akFile}
-			chown --reference=${MAPR_USER_DIR} \
-				${MAPR_USER_DIR}/.ssh/$kf ${akFile}
-		fi
-	done
-}
-
 # Returns 1 if volume comes on line within 5 minutes
 # Need this functionality to ensure proper addition of our new volumes.
 #
@@ -911,7 +854,7 @@ wait_for_mapr_volume() {
 finalize_mapr_cluster() {
 	[ "${restore_only}" = "true" ] && return 
 
-#	echo "Entering finalize_mapr_cluster" >> $LOG
+	echo "Entering finalize_mapr_cluster" >> $LOG
 
 	which maprcli  &> /dev/null
 	if [ $? -ne 0 ] ; then
@@ -1067,12 +1010,17 @@ function main()
 		verbose_flag="-v"
 	fi
 
+	if [ $MVER -ge 40  ] ; then
+		[ -n "$rmnodes" ] && YARNARG="-RM $rmnodes"
+		[ -n "$hsnode" ] && YARNARG="$YARNARG -HS $hsnode"
+	fi
+
 		# Waiting for the nodes at this point SHOULD be unnecessary,
 		# since we had to have the node alive to re-spawn this part
 		# of the script.  So we can just do the configuration
 	c $MAPR_HOME/server/configure.sh \
 		$verbose_flag \
-		-N $cluster -C $cldbnodes -Z $zknodes \
+		-N $cluster -C $cldbnodes -Z $zknodes ${YARNARG:-} \
 	    -u $MAPR_USER -g $MAPR_GROUP \
 		$M7ARG $AUTOSTARTARG $SECARG $VMARG
 
