@@ -185,6 +185,10 @@ fi
 # The ZK and CLDB host settings are easy, since GCE will set up
 # micro-dns to make our assigned hostnames consistent across the deployed
 # nodes.
+#
+# ResourceManager and History server nodes are necessary only for
+# MapR 4.0 and later; we'll look for them for every cluster, though.
+#
 #	DOWNSIDE : be careful not to launch multiple clusters with the same
 #	hostname defaults.
 #
@@ -207,6 +211,23 @@ for cldbh in `echo $cldbnodes` ; do
 	else cldbhosts=$cldbh
 	fi
 done
+
+rmnodes=`grep ^$NODE_NAME_ROOT $configFile | grep resourcemanager | cut -f1 -d:`
+for rmh in `echo $rmnodes` ; do
+	rmidx=${rmh#${NODE_NAME_ROOT}}
+
+	[ -n "${nodeName:-}" ] && rmh=${nodeName}$rmidx
+	if [ -n "${rmhosts:-}" ] ; then rmhosts=$rmhosts','$rmh
+	else rmhosts=$rmh
+	fi
+done
+
+hsnode=`grep ^$NODE_NAME_ROOT $configFile | grep historyserver | head -1 | cut -f1 -d:`
+if [ -n "$hsnode" ] ; then
+	hsidx=${hsnode#${NODE_NAME_ROOT}}
+
+	[ -n "${nodeName:-}" ] && hsnode=${nodeName}$hsidx
+fi
 
 # Grab just one metrics node to run the MySQL service
 metricsnode=`grep ^$NODE_NAME_ROOT $configFile | grep metrics | head -1 | cut -f1 -d:`
@@ -296,6 +317,8 @@ do
 		--metadata="cluster:${cluster}" \
 		--metadata="zknodes:${zkhosts}" \
 		--metadata="cldbnodes:${cldbhosts}" \
+		--metadata="rmnodes:${rmhosts}" \
+		--metadata="hsnode:${hsnode}" \
 		--wait_until_running \
 		--service_account_scopes=storage-full \
     $host &
