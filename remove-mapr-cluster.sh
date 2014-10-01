@@ -104,14 +104,14 @@ do
 	idx=${host#${NODE_NAME_ROOT}}
 	[ -n "${nodeName:-}" ] && host=${nodeName}$idx
 
-	echo "remove instance $host"
+	echo "Remove instance $host"
 	gcutil deleteinstance \
 		--project=$project \
 		--force=TRUE \
 		--nodelete_boot_pd \
 		$host
 
-	echo "remove disk $host"
+	echo "Remove disk $host"
 	gcutil deletedisk \
 		--project=$project \
 		--force=TRUE \
@@ -119,7 +119,7 @@ do
 
 	if [ -n "${pdisk:-}" ] ; then
 		echo ""
-		echo " Delete persistent data volumes (pdisk)"
+		echo " Delete persistent data volumes (${host}-pdisk-*)"
 		delete_persistent_data_disks $host
 	fi
 done
