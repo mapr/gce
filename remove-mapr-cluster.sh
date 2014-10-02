@@ -2,7 +2,7 @@
 #
 #  Script to remove an lanched MapR cluster in the Google Cloud Environment.
 #   --config-file --persistent-disks --node-name should be consistent with 
-#  the ones that lanch script used.
+#  the ones that launch script used.
 #
 #	By default, the nodes will be given hostnames equivalent to the
 #	name specification (eg "node0", "node1", "node2" in the above example).
@@ -104,22 +104,22 @@ do
 	idx=${host#${NODE_NAME_ROOT}}
 	[ -n "${nodeName:-}" ] && host=${nodeName}$idx
 
-	echo "remove instance $host"
+	echo "Remove instance $host"
 	gcutil deleteinstance \
 		--project=$project \
 		--force=TRUE \
 		--nodelete_boot_pd \
 		$host
 
-	echo "remove disk $host"
+	echo "Remove disk $host"
 	gcutil deletedisk \
 		--project=$project \
 		--force=TRUE \
 		$host
 
-if [ -n "${pdisk:-}" ] ; then
+	if [ -n "${pdisk:-}" ] ; then
 		echo ""
-		echo " Delete persistent data volumes (pdisk)"
+		echo " Delete persistent data volumes (${host}-pdisk-*)"
 		delete_persistent_data_disks $host
 	fi
 done

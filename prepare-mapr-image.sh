@@ -105,12 +105,22 @@ function add_epel_repo() {
     CVER=${CVER:-6}
     if [ ${CVER%.*} -eq 5 ] ; then
         EPEL_LOC="epel/5/x86_64/epel-release-5-4.noarch.rpm"
+	elif [ "${CVER%.*}" -eq 7 ] ; then
+		EPEL_LOC="epel/7/x86_64/e/epel-release-7-2.noarch.rpm"
     else
         EPEL_LOC="epel/6/x86_64/epel-release-6-8.noarch.rpm"
     fi
 
-    wget -O $EPEL_RPM http://download.fedoraproject.org/pub/$EPEL_LOC
-    [ $? -eq 0 ] && rpm --quiet -i $EPEL_RPM
+	epel_def=/etc/yum.repos.d/epel.repo
+	if [ -f $epel_def ] ; then
+		grep -q "^enabled=1" $epel_def
+		if [ $? -ne 0 ] ; then
+			sed -i '0,/^enabled=0/s/enabled=0/enabled=1/' $epel_def
+		fi
+	else
+		curl -L -f -o $EPEL_RPM http://download.fedoraproject.org/pub/$EPEL_LOC
+		[ $? -eq 0 ] && rpm --quiet -i $EPEL_RPM
+	fi
 }
 
 
@@ -253,30 +263,8 @@ function update_os() {
 # Whatever version of Java we want, we can do here.  The
 # OpenJDK is a little easier because the mechanism for accepting
 # the Oracle JVM EULA changes frequently.
-#	NOTE: As of 2012, there is no way to automate the installation of
-#	the Oracle JDK for RPM distributions; that only the OpenJDK is 
-#	supported in an automated fashion.
 #
 #	Be sure to add the JAVA_HOME to our environment ... we'll use it later
-
-function install_openjdk_deb() {
-    echo "Installing OpenJDK packages (for deb distros)" >> $LOG
-
-	c apt-get install -y x11-utils
-
-		# The GCE Debian 6 image doesn't have a repo enabled for
-		# Java 7 ... stick with Java 6 fo that version
-	deb_version=`cat /etc/debian_version`
-	if [ -n "$deb_version"  -a  "${deb_version%%.*}" = "6" ] ; then
-		c apt-get install -y openjdk-6-jdk openjdk-6-doc 
-		JAVA_HOME=/usr/lib/jvm/java-6-openjdk
-	else
-		c apt-get install -y openjdk-7-jdk openjdk-7-doc 
-		JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
-	fi
-	export JAVA_HOME
-	echo "	JAVA_HOME=$JAVA_HOME" >> $LOG
-}
 
 function install_oraclejdk_deb() {
     echo "Installing Oracle JDK (for deb distros)" >> $LOG
@@ -292,43 +280,88 @@ function install_oraclejdk_deb() {
 
 	apt-get install -y x11-utils
 	apt-get install -y oracle-jdk7-installer
+	if [ $? -ne 0 ] ; then
+		echo "  Oracle JDK installation failed" >> $LOG
+		return 1
+	fi
 
 #	update-java-alternatives -s java-7-oracle
 
 	JAVA_HOME=/usr/lib/jvm/java-7-oracle
 	export JAVA_HOME
     echo "	JAVA_HOME=$JAVA_HOME"
+
+	return 0
+}
+
+function install_openjdk_deb() {
+    echo "Installing OpenJDK packages (for deb distros)" >> $LOG
+
+	apt-get install -y x11-utils
+
+		# The GCE Debian 6 image doesn't have a repo enabled for
+		# Java 7 ... stick with Java 6 fo that version
+	deb_version=`cat /etc/debian_version`
+	if [ -n "$deb_version"  -a  "${deb_version%%.*}" = "6" ] ; then
+		apt-get install -y openjdk-6-jdk openjdk-6-doc 
+		JAVA_HOME=/usr/lib/jvm/java-6-openjdk
+	else
+		apt-get install -y openjdk-7-jdk openjdk-7-doc 
+		JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
+	fi
+	export JAVA_HOME
+	echo "	JAVA_HOME=$JAVA_HOME" >> $LOG
+}
+
+function install_oraclejdk_rpm() {
+    echo "Installing Oracle JDK (for rpm distros)" >> $LOG
+
+	JDK_RPM="http://download.oracle.com/otn-pub/java/jdk/7u67-b01/jdk-7u67-linux-x64.rpm"
+
+	$(cd /tmp; curl -f -L -C - -b "oraclelicense=accept-securebackup-cookie" -O $JDK_RPM)
+
+	RPM_FILE=/tmp/`basename $JDK_RPM`
+	if [ ! -s $RPM_FILE ] ; then
+    	echo "	Downloading Oracle JDK failed" >> $LOG
+		return 1
+	fi
+	
+	rpm -ivh $RPM_FILE
+	if [ $? -ne 0 ] ; then
+    	echo "	Oracle JDK installation failed" >> $LOG
+		return 1
+	fi
+
+	JAVA_HOME=/usr/java/latest
+	export JAVA_HOME
+    echo "	JAVA_HOME=$JAVA_HOME" | tee -a $LOG
+
+	return 0
 }
 
 function install_openjdk_rpm() {
     echo "Installing OpenJDK packages (for rpm distros)" >> $LOG
 
-	c yum install -y java-1.7.0-openjdk java-1.7.0-openjdk-devel 
-	c yum install -y java-1.7.0-openjdk-javadoc
+	yum install -y java-1.7.0-openjdk java-1.7.0-openjdk-devel 
+#	yum install -y java-1.7.0-openjdk-javadoc
 
-	JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk.x86_64
+	jcmd=`readlink -f /usr/bin/java`
+	JAVA_HOME=${jcmd%/bin/java}
+	[ -z "${JAVA_HOME}" ] && JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk
 	export JAVA_HOME
     echo "	JAVA_HOME=$JAVA_HOME" >> $LOG
-}
-
-function install_oraclejdk_rpm() {
-    echo "Automated installation of Oracle JDK for rpm distros is not supported" >> $LOG
-    echo "Falling back to OpenJDK" >> $LOG
-	install_openjdk_rpm
 }
 
 # This has GOT TO SUCCEED ... otherwise the node is useless for MapR
 function install_java() {
 	echo Installing JAVA >> $LOG
 
-		# If Java is already installed, simply make sure we know
-		# the JAVA_HOME.   We should be smarter about checking for
-		# a valid version, but since both 1.6 and 1.7 work, we should
-		# be safe.
+		# If Java is already installed, simply set JAVA_HOME
+		# Should check for Java version, but both 1.6 and 1.7 work.
 		#
 	javacmd=`which java`
 	if [ $? -eq 0 ] ;  then
-		echo "Java already installed on this instance" >> $LOG
+		echo "JRE (and possibly JDK) already installed on this instance" >> $LOG
 		java -version 2>&1 | head -1 >> $LOG
 
 			# We could be linked to the JRE or JDK version; we want
@@ -337,7 +370,7 @@ function install_java() {
 		if [ -x ${jcmd%/jre/bin/java}/bin/javac ] ; then
 			JAVA_HOME=${jcmd%/jre/bin/java}
 		elif [ -x ${jcmd%/java}/javac ] ; then
-			JAVA_HOME=${jcmd%/java}
+			JAVA_HOME=${jcmd%/bin/java}
 		else
 			JAVA_HOME=""
 		fi
@@ -346,29 +379,32 @@ function install_java() {
 			echo "	JAVA_HOME=$JAVA_HOME" | tee -a $LOG
 
 			echo updating /etc/profile.d/javahome.sh >> $LOG
-			echo "JAVA_HOME=${JAVA_HOME}" >> /etc/profile.d/javahome.sh
-			echo "export JAVA_HOME" >> /etc/profile.d/javahome.sh
+			echo "JAVA_HOME=${JAVA_HOME}"   > /etc/profile.d/javahome.sh
+			echo "export JAVA_HOME"        >> /etc/profile.d/javahome.sh
 
 			return 0
 		fi
 
-		echo "Could not identify JAVA_HOME; will install Java ourselves" >> $LOG
+		echo "Could not identify JAVA_HOME; will install JDK ourselves" >> $LOG
 	fi
 
 	if which dpkg &> /dev/null; then
 		install_openjdk_deb
+		[ $? -ne 0 ] && install_openjdk_deb
 	elif which rpm &> /dev/null; then
 		install_openjdk_rpm
+		[ $? -ne 0 ] && install_openjdk_rpm
 	fi
 
-	if [ -x /usr/bin/java ] ; then
+	if [ -x $JAVA_HOME/bin/java ] ; then
 		echo Java installation complete >> $LOG
 
-		if [ -n "${JAVA_HOME}" ] ; then
-			echo updating /etc/profile.d/javahome.sh >> $LOG
-			echo "JAVA_HOME=${JAVA_HOME}" >> /etc/profile.d/javahome.sh
-			echo "export JAVA_HOME" >> /etc/profile.d/javahome.sh
-		fi
+			# Strip of jre just in case
+		JAVA_HOME="${JAVA_HOME%/jre}"
+
+		echo updating /etc/profile.d/javahome.sh >> $LOG
+		echo "JAVA_HOME=${JAVA_HOME}"   > /etc/profile.d/javahome.sh
+		echo "export JAVA_HOME"        >> /etc/profile.d/javahome.sh
 	else
 		echo Java installation failed >> $LOG
 	fi
@@ -457,6 +493,11 @@ function setup_mapr_repo_deb() {
     MAPR_PKG="http://package.mapr.com/releases/v${MAPR_VERSION}/ubuntu"
     MAPR_ECO="http://package.mapr.com/releases/ecosystem/ubuntu"
 
+	major_ver=${MAPR_VERSION%%.*}
+	if [ ${major_ver:-3} -gt 3 ] ; then
+		MAPR_ECO=${MAPR_ECO//ecosystem/ecosystem-${major_ver}.x}
+	fi
+
     echo Setting up repos in $MAPR_REPO_FILE
 
     if [ ! -f $MAPR_REPO_FILE ] ; then
@@ -475,6 +516,11 @@ function setup_mapr_repo_rpm() {
     MAPR_REPO_FILE=/etc/yum.repos.d/mapr.repo
     MAPR_PKG="http://package.mapr.com/releases/v${MAPR_VERSION}/redhat"
     MAPR_ECO="http://package.mapr.com/releases/ecosystem/redhat"
+
+	major_ver=${MAPR_VERSION%%.*}
+	if [ ${major_ver:-3} -gt 3 ] ; then
+		MAPR_ECO=${MAPR_ECO//ecosystem/ecosystem-${major_ver}.x}
+	fi
 
     echo Setting up repos in $MAPR_REPO_FILE
 
