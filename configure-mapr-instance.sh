@@ -15,7 +15,7 @@
 # Allow a little time for the network and instantiation processes to settle.
 sleep 3
 
-# Metadata for this instance ... pull out details that we'll need
+# Extract configuration details from instance metadata
 #
 murl_top=http://metadata/computeMetadata/v1
 murl_attr="${murl_top}/instance/attributes"
@@ -28,10 +28,10 @@ else
 	THIS_HOST=`/bin/hostname`
 fi
 
-THIS_IMAGE=$(curl -H "$md_header" -f $murl_attr/image)    # name of initial image loaded here
+THIS_IMAGE=$(curl -H "$md_header" -f $murl_attr/image)
 GCE_PROJECT=$(curl -H "$md_header" -f $murl_top/project/project-id) 
 
-MAPR_HOME=$(curl -H "$md_header" -f $murl_attr/maprhome)	# software installation directory
+MAPR_HOME=$(curl -H "$md_header" -f $murl_attr/maprhome)
 MAPR_HOME=${MAPR_HOME:-"/opt/mapr"}
 MAPR_UID=$(curl -H "$md_header" -f $murl_attr/mapruid)
 MAPR_UID=${MAPR_UID:-"2000"}
@@ -434,17 +434,16 @@ configure_mapr_services() {
 	done
 }
 
-# Simple script to add useful parameters to the 
-# Hadoop *.xml configuration files.   This should be done
-# as a separate Python or Perl script to better handle
-# the xml format !!!
+# Simple script to update Hadoop configuraton files.
+# This should be done as a separate Python or Perl script 
+# to better handle the xml format !!!
 #
 update_site_config() {
 	echo "Updating site configuration files" >> $LOG
 
 		# Default hadoop version changed with 4.x
 	if [ ${MAPR_VERSION%%.*} -le 3 ] ; then
-		HADDOP_HOME=${MAPR_HOME}/hadoop/hadoop-0.20.2
+		HADOOP_HOME=${MAPR_HOME}/hadoop/hadoop-0.20.2
 		HADOOP_CONF_DIR=${HADOOP_HOME}/conf
 	else
 		HADOOP_HOME="$(ls -d /opt/mapr/hadoop/hadoop-2*)"
@@ -976,13 +975,11 @@ function main()
 
 	[ -n "${THIS_IMAGE}" ] && VMARG="--isvm"
 	if [ ${MVER} -ge 30 ] ; then
-		if [ "${MAPR_VERSION}" != "3.0.0-GA" ] ; then
-			echo $MAPR_PACKAGES | grep -q hbase
+		echo $MAPR_PACKAGES | grep -q hbase
+		[ $? -eq 0 ] && M7ARG="-M7"
+		if [ -z "${M7ARG:-}"  -a  ${#MAPR_LICENSE} -gt 0 ] ; then
+			echo ${MAPR_LICENSE} | grep -q MAPR_TABLES
 			[ $? -eq 0 ] && M7ARG="-M7"
-			if [ -z "${M7ARG:-}"  -a  ${#MAPR_LICENSE} -gt 0 ] ; then
-				echo ${MAPR_LICENSE} | grep -q MAPR_TABLES
-				[ $? -eq 0 ] && M7ARG="-M7"
-			fi
 		fi
 	fi
 
@@ -1015,9 +1012,7 @@ function main()
 		[ -n "$hsnode" ] && YARNARG="$YARNARG -HS $hsnode"
 	fi
 
-		# Waiting for the nodes at this point SHOULD be unnecessary,
-		# since we had to have the node alive to re-spawn this part
-		# of the script.  So we can just do the configuration
+		# Configure the MapR installation
 	c $MAPR_HOME/server/configure.sh \
 		$verbose_flag \
 		-N $cluster -C $cldbnodes -Z $zknodes ${YARNARG:-} \
@@ -1030,8 +1025,7 @@ function main()
 
 	provision_mapr_disks
 
-		# Most of the time in virtual environments we DO NOT 
-		# want to auto-start ... so we'll control that here.
+		# Don't autostart MapR in virtual environments
 	if [ -z "${THIS_IMAGE}" ] ; then
 		enable_mapr_services
 	else
