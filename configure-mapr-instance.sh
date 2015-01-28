@@ -1007,7 +1007,7 @@ function main()
 		verbose_flag="-v"
 	fi
 
-	if [ $MVER -ge 40  ] ; then
+	if [ $MAPR_VERSION = "4.0.1" ] ; then
 		[ -n "$rmnodes" ] && YARNARG="-RM $rmnodes"
 		[ -n "$hsnode" ] && YARNARG="$YARNARG -HS $hsnode"
 	fi
