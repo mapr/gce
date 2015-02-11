@@ -1009,8 +1009,8 @@ function main()
 
 	if [ $MAPR_VERSION = "4.0.1" ] ; then
 		[ -n "$rmnodes" ] && YARNARG="-RM $rmnodes"
-		[ -n "$hsnode" ] && YARNARG="$YARNARG -HS $hsnode"
 	fi
+	[ -n "$hsnode" ] && YARNARG="${YARNARG:-} -HS $hsnode"
 
 		# Configure the MapR installation
 	c $MAPR_HOME/server/configure.sh \
