@@ -101,12 +101,17 @@ c() {
 #
 function add_epel_repo() {
     EPEL_RPM=/tmp/epel.rpm
-    CVER=`lsb_release -r | awk '{print $2}'`
+	if [ `which lsb_release 2> /dev/null` ] ; then
+    	CVER=`lsb_release -r | awk '{print $2}'`
+	elif [ -f /etc/centos-release ] ; then
+		CVER=`grep -o '[0-9]*' /etc/centos-release | head -1`
+	fi
+
     CVER=${CVER:-6}
     if [ ${CVER%.*} -eq 5 ] ; then
         EPEL_LOC="epel/5/x86_64/epel-release-5-4.noarch.rpm"
 	elif [ "${CVER%.*}" -eq 7 ] ; then
-		EPEL_LOC="epel/7/x86_64/e/epel-release-7-2.noarch.rpm"
+		EPEL_LOC="epel/7/x86_64/e/epel-release-7-5.noarch.rpm"
     else
         EPEL_LOC="epel/6/x86_64/epel-release-6-8.noarch.rpm"
     fi
@@ -131,7 +136,7 @@ function add_epel_repo() {
 # right away.
 function update_os_deb() {
 	apt-get update
-	c apt-get upgrade -y -o Dpkg::Options::="--force-confdef,confold"
+#	c apt-get upgrade -y -o Dpkg::Options::="--force-confdef,confold"
 	c apt-get install -y nfs-common iputils-arping libsysfs2
 	c apt-get install -y ntp
 
@@ -152,7 +157,7 @@ function update_os_rpm() {
 	add_epel_repo
 
 	yum makecache
-	c yum update -y --exclude=module-init-tools
+#	c yum update -y --exclude=module-init-tools
 	c yum install -y nfs-utils iputils libsysfs
 	c yum install -y ntp ntpdate
 
@@ -316,7 +321,7 @@ function install_openjdk_deb() {
 function install_oraclejdk_rpm() {
     echo "Installing Oracle JDK (for rpm distros)" >> $LOG
 
-	JDK_RPM="http://download.oracle.com/otn-pub/java/jdk/7u67-b01/jdk-7u67-linux-x64.rpm"
+	JDK_RPM="http://download.oracle.com/otn-pub/java/jdk/7u71-b14/jdk-7u71-linux-x64.rpm"
 
 	$(cd /tmp; curl -f -L -C - -b "oraclelicense=accept-securebackup-cookie" -O $JDK_RPM)
 
@@ -389,10 +394,10 @@ function install_java() {
 	fi
 
 	if which dpkg &> /dev/null; then
-		install_openjdk_deb
+		install_oraclejdk_deb
 		[ $? -ne 0 ] && install_openjdk_deb
 	elif which rpm &> /dev/null; then
-		install_openjdk_rpm
+		install_oraclejdk_rpm
 		[ $? -ne 0 ] && install_openjdk_rpm
 	fi
 
