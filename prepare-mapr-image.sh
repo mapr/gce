@@ -16,7 +16,7 @@
 #	- Basic distro differences (APT-GET vs YUM, etc) can be handled
 #	    There are so few differences, it seemed better to manage one script.
 #
-# Tested with MapR 2.0.x, 2.1.x, and 3.x
+# Tested with MapR 2.x, 3.x, and 4.x
 #
 # JAVA
 #	This script default to OpenJDK; the logic to support Oracle JDK 
@@ -163,6 +163,7 @@ function update_os_rpm() {
 
 	c yum install -y syslinux sdparm
 	c yum install -y sysstat
+	c yum install -y bind-utils
 	yum install -y clustershell pdsh
 }
 
@@ -258,7 +259,7 @@ function update_os() {
   SELINUX_CONFIG=/etc/selinux/config
   if [ -f $SELINUX_CONFIG ] ; then
 	sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' $SELINUX_CONFIG
-	echo 0 > /selinux/enforce
+	[ -d /selinux ] && echo 0 > /selinux/enforce
   fi
 
 	update_ntp_config
@@ -321,7 +322,7 @@ function install_openjdk_deb() {
 function install_oraclejdk_rpm() {
     echo "Installing Oracle JDK (for rpm distros)" >> $LOG
 
-	JDK_RPM="http://download.oracle.com/otn-pub/java/jdk/7u71-b14/jdk-7u71-linux-x64.rpm"
+	JDK_RPM="http://download.oracle.com/otn-pub/java/jdk/7u75-b13/jdk-7u75-linux-x64.rpm"
 
 	$(cd /tmp; curl -f -L -C - -b "oraclelicense=accept-securebackup-cookie" -O $JDK_RPM)
 
