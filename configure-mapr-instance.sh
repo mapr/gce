@@ -264,7 +264,7 @@ install_mapr_packages() {
 #
 find_mapr_disks() {
 	disks=""
-	for d in `fdisk -l 2>/dev/null | grep -e "^Disk .* bytes$" | awk '{print $2}' `
+	for d in `fdisk -l 2>/dev/null | grep -e "^Disk .* bytes.*$" | awk '{print $2}' `
 	do
 		dev=${d%:}
 
@@ -292,6 +292,8 @@ find_mapr_disks() {
 # Format disks (discovered or passed in as MAPR_DISKS) for MapR
 #
 provision_mapr_disks() {
+	echo "Provisioning data disks for mfs" >> $LOG
+
 	diskfile=/tmp/MapR.disks
 	disktab=$MAPR_HOME/conf/disktab
 	rm -f $diskfile
@@ -330,6 +332,8 @@ provision_mapr_disks() {
 
 # Update MapR host identity files if necessary.
 configure_host_identity() {
+	echo "Configuring host identity" >> $LOG
+
 	if [ "${restore_only}" = "true" ] ; then
 		if [ -n "${restore_hostid}" ] ; then
 			echo $restore_hostid > $MAPR_HOME/hostid
@@ -344,10 +348,18 @@ configure_host_identity() {
 
 	HOSTNAME_FILE="$MAPR_HOME/hostname"
 	if [ ! -f $HOSTNAME_FILE ]; then
-		/bin/hostname --fqdn > $HOSTNAME_FILE
-		chown $MAPR_USER:$MAPR_GROUP $HOSTNAME_FILE
-		if [ $? -ne 0 ]; then
-			rm -f $HOSTNAME_FILE
+		if [ -n "$THIS_FQDN" ] ; then
+			echo "$THIS_FQDN" > $HOSTNAME_FILE
+		elif [ -n "$THIS_HOST" ] ; then
+			echo "$THIS_HOST" > $HOSTNAME_FILE
+		else
+			my_fqdn=`/bin/hostname --fqdn`
+			[ -n "$my_fqdn" ] && echo "$my_fqdn" > $HOSTNAME_FILE
+		fi
+		
+		if [ -f $HOSTNAME_FILE ] ; then
+			chown $MAPR_USER:$MAPR_GROUP $HOSTNAME_FILE
+		else
 			echo "Cannot find valid hostname. Please check your DNS settings" >> $LOG
 		fi
 	fi
@@ -1011,6 +1023,9 @@ function main()
 		[ -n "$rmnodes" ] && YARNARG="-RM $rmnodes"
 	fi
 	[ -n "$hsnode" ] && YARNARG="${YARNARG:-} -HS $hsnode"
+
+		# configure.sh appears to need JAVA_HOME
+	[ -f /etc/profile.d/javahome.sh ]  && . /etc/profile.d/javahome.sh
 
 		# Configure the MapR installation
 	c $MAPR_HOME/server/configure.sh \
