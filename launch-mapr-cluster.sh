@@ -141,7 +141,7 @@ project=${project:-"maprtt"}
 maprversion=${maprversion:-"3.1.0"}
 machinetype=${machinetype:-"n1-standard-2"}
 zone=${zone:-"us-central1-b"}
-licenseFile=${licenseFile:-"/Users/dtucker/Documents/MapR/licenses/LatestDemoLicense-M5.txt"}
+licenseFile=${licenseFile:-"/Users/dtucker/Documents/MapR/licenses/LatestDemoLicense-M7.txt"}
 pboot=${pboot:-"true"}
 
 if [ -n "${image:-}" ] ; then
