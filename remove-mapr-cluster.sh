@@ -30,11 +30,12 @@ usage() {
        --project <GCE Project>
        --config-file <cfg-file>         # Need to the same as lanch-mapr-cluster.sh used
        --persistent-disks <nxm>         # N disks of M gigabytes, need to the same as lanch-mapr-cluster.sh used
+       --zone gcutil-zone
       [ --node-name <name-prefix>      # hostname prefix for cluster nodes ]
    "
   echo ""
   echo "EXAMPLES"
-  echo "$0 --config-file 3node.lst --node-name test --persistent-disks 4x256"
+  echo "$0 --config-file 3node.lst --node-name test --zone us-central1-f --persistent-disks 4x256"
 }
 
 
@@ -63,10 +64,10 @@ delete_persistent_data_disks() {
 		diskname=${targetNode}-pdisk-${d}
 
 		echo "Delete pdisk ${diskname}"
-		gcutil deletedisk \
+		gcloud compute disks delete -q \
 			$diskname \
-			--project=$project \
-			--force=TRUE
+			--project $project \
+			--zone $zone
  	done
 }
 
@@ -86,6 +87,7 @@ do
   --config-file)  configFile=$2  ;;
   --node-name)    nodeName=$2  ;;
   --project)      project=$2  ;;
+  --zone)         zone=$2  ;;
   --persistent-disks)      pdisk=$2  ;;
   *)
      echo "****" Bad argument:  $1
@@ -105,16 +107,16 @@ do
 	[ -n "${nodeName:-}" ] && host=${nodeName}$idx
 
 	echo "Remove instance $host"
-	gcutil deleteinstance \
-		--project=$project \
-		--force=TRUE \
-		--nodelete_boot_pd \
+	gcloud compute instances delete -q \
+		--project $project \
+		--keep-disks boot \
+		--zone $zone \
 		$host
 
 	echo "Remove disk $host"
-	gcutil deletedisk \
-		--project=$project \
-		--force=TRUE \
+	gcloud compute disks delete -q \
+		--project $project \
+		--zone $zone \
 		$host
 
 	if [ -n "${pdisk:-}" ] ; then
