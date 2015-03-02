@@ -42,10 +42,10 @@ echo gcloud compute --project=$GCE_PROJECT \
 	  image=$baseImage \
       maprversion=$maprversion \
       maprpackages=cldb,jobtracker,fileserver,tasktracker \
-    --metadata_from_file \
+    --metadata-from-file \
 	  startup-script=prepare-mapr-image.sh \
     --zone=$GCE_ZONE \
-    --machine_type=$mach \
+    --machine-type=$mach \
 	--image=$baseImage 
 
 gcloud compute --project=$GCE_PROJECT \
@@ -54,9 +54,9 @@ gcloud compute --project=$GCE_PROJECT \
 	  image=$baseImage \
       maprversion=$maprversion \
       maprpackages=cldb,jobtracker,fileserver,tasktracker \
-    --metadata_from_file \
+    --metadata-from-file \
 	  startup-script=prepare-mapr-image.sh \
     --zone=$GCE_ZONE \
-    --machine_type=$mach \
+    --machine-type=$mach \
 	--image=$baseImage 
 

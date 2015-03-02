@@ -88,7 +88,7 @@ create_persistent_data_disks() {
 				$diskname \
 				--project $project \
 				--zone $zone \
-				--size_gb ${dsize} 
+				--size ${dsize}GB
 			if [ $? -eq 0 ] ; then
 				pdisk_args=${pdisk_args}' '--disk' 'name=$diskname' 'mode=rw
 			fi
@@ -152,19 +152,6 @@ if [ "${machinetype%-d}" = "${machinetype}" ] ; then
 		exit 1
 	fi
 fi
-
-# If the image has "mapr" in it, we'll assume it's in our project;
-# otherwise, look it up.
-#	NOTE: this logic is not necessary as of vbeta15 of the gcutil command
-#		if [ "${maprimage%mapr*}" = ${maprimage} ] ; then
-#			img=`gcutil --project $project listimages --old_images | grep $maprimage | awk '{print $2}'`
-#			if [ -n "${img}" ] ; then
-#				maprimage=$img
-#			else
-#				echo "Image $maprimage not found; aborting cluster creation"
-#				exit 1
-#			fi
-#		fi
 
 # TBD 
 #	Validate the presense/accessibility of the image
@@ -287,15 +274,19 @@ do
 		echo "   Creating persistent data volumes first (pdisk)"
 		create_persistent_data_disks $host
 			# Side effect ... pdisk_args is set 
+			#
+			# An empty "pdisk_args" implies failed storage creation ...
+			# so don't proceed with instance creation.
+		[ -z "$pdisk_args" ] && continue
 	fi
 
 	gcloud compute instances create $host \
 		--project $project \
 		--image $maprimage \
-		--machine_type $machinetype \
+		--machine-type $machinetype \
 		--zone $zone \
 		${pdisk_args:-} \
-		--metadata_from_file \
+		--metadata-from-file \
 		  startup-script=configure-mapr-instance.sh \
 		  maprimagerscript=prepare-mapr-image.sh \
 		  ${license_args:-} \
