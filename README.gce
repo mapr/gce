@@ -7,11 +7,16 @@ DIRECTORY CONTENTS
 
 	relaunch-mapr-cluster.sh : 
 		High-level script to respawn the instances deployed with
-		launch-mapr-cluster.sh for a MapR instance.  This is 
-		necessary since the current Google Cloud (Apr 2014) does
-		not have the concept of "stop" and "restart" for instances;
+		launch-mapr-cluster.sh for a MapR instance.  This was 
+		necessary with early versions of Google Compute Cloud (Apr 2014),
+		where there was no concept of "stop" and "restart" for instances;
 		you much delete and relaunch instances with the same
 		persisitent storage created during the initial launch.
+			NOTE: No longer necessary as of Fall 2014
+
+	remove-mapr-cluster.sh : 
+		Helper utility to terminate GCE instances and all persistent
+		storage associated with a cluster.
 
 	*node.lst :
 		Sample configuration files to be used by launch-mapr-cluster.sh
@@ -22,8 +27,9 @@ DIRECTORY CONTENTS
 		much time over "install everything at instantiation".  However,
 		you may want to customize a base image (with specific user 
 		accounts, additional non-MapR software, etc).  
-			Details: uses gcutil to create an instance and passes in 
-			the prepare-mapr-image.sh script as the startup process.
+			Details: uses gcloud utilties to create an instance and 
+			passes in the prepare-mapr-image.sh script as part of
+			the startup process.
 
 	prepare-mapr-image.sh : 
 		Install key dependencies (eg Java) and specified MapR software.  
@@ -55,23 +61,45 @@ GETTING STARTED
 ---------------
 Ensure that your environment is ready to support GCE deployments
 	- a GCE project exists on which you can deploy instances
-	- gcutil is installed (be sure to download the latest version)
+	- gcloud utilties are installed (be sure to download the latest version)
 	- your default GCE credentials are established
-		- use 'gcutil config' to establish the credentials to your GCE account
+		- use 'gcloud config' to establish the credentials to your GCE account
 
 Use launch-mapr-cluster.sh to create your first cluster :
 	./launch-mapr-cluster.sh \
 		--cluster TestCluster \
-		--node-name test \
-		--mapr-version 3.0.1 \
-		--config-file 3node.lst \
-		--image centos-6-v20130813 \
-		--machine-type n1-standard-2-d"
+		--node-name tc \
+		--zone us-central1-f \
+		--mapr-version 4.0.2 \
+		--config-file 4node_yarn.lst \
+		--image centos-7 \
+		--machine-type n1-standard-2" \
+		--persistent-disks 1x256
 
 The output logs from the prepare-* and configure-* scripts will
 be saved to /home/mapr on the instances.   The file 
 /var/log/startupscript.log contains the stdout record from the execution
 of configure-mapr-instance.sh (the script we pass in as the startup script).
+
+Access to the GCE nodes is facilitated by the gcloud utility. 
+	# Add aliaes for GCE nodes into ~/.ssh/config; execute this after
+	# every launch of a cluster or other GCE resource
+	gcloud compute config-ssh	
+
+	# Then direct access is simple
+	ssh tc1.us-central1-f.<myproject>
+
+To access the MapR Control System Console, simply identify the hostname
+of the node hosting the webserver service (usually node1) and browse
+to https://<natIP>:8443.   The example below uses the jq utility to 
+parse json output from the gcloud command and print out the NAT IP
+for the first node in the sample cluster above.
+
+	gcloud compute instances describe tc1 --zone us-central1-b --format json | \
+	  jq ".networkInterfaces[0].accessConfigs[0].natIP"
+
+or, more simply
+	gcloud compute instances describe tc1 --zone us-central1-b | grep natIP
 
 
 KNOWN LIMITATIONS
