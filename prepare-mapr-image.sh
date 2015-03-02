@@ -35,7 +35,7 @@ sleep 10
 #
 murl_top=http://metadata/computeMetadata/v1
 murl_attr="${murl_top}/instance/attributes"
-md_header="X-Google-Metadata-Request: True"
+md_header="Metadata-Flavor: Google"
 
 THIS_FQDN=$(curl -H "$md_header" -f $murl_top/instance/hostname)
 if [ -z "${THIS_FQDN}" ] ; then
