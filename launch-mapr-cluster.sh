@@ -16,14 +16,11 @@
 #	name specification (eg "node0", "node1", "node2" in the above example).
 #	The base hostname can be overridden with the "--node-name" option.
 #
-#	Node boot disks default to persistent; For ephemeral boot disks,
-#	use the "--persistent-boot" option (set to false).
-#
 #	Data disks default to ephemeral, but persistent disks can 
 #	be requested on the command line and automatically allocated.
 #
 # Assumptions:
-#   gcutil tool is in the PATH
+#   gcloud tool is in the PATH
 #
 # Tricks
 #	Pass in prepare-mapr-image.sh script as metadata ... to be used
@@ -46,9 +43,8 @@ usage() {
        --image image_name
        --machine-type <machine-type>
        --persistent-disks <nxm>         # N disks of M gigabytes 
-       --zone gcutil-zone
+       --zone zone
        [ --node-name <name-prefix>      # hostname prefix for cluster nodes ]
-       [ --persistent-boot [TRUE|false] # persistent storage for boot device ]
        [ --license-file <license to be installed> ]
    "
   echo ""
@@ -59,7 +55,7 @@ usage() {
 
 	# Build up the disk argument CAREFULLY ... the shell
 	# addition of extra ' and " characters really confuses the
-	# final invocation of gcutil
+	# final invocation of gcloud
 	#
 	# We could be smarter about error handling, but it's safer
 	# to simply ignore any disk where there is a problem creating
@@ -81,20 +77,20 @@ create_persistent_data_disks() {
 	do
 		diskname=${targetNode}-pdisk-${d}
 
-		gcutil listdisks --project=$project --zone=$zone \
-			--format=names --filter="name eq $diskname" \
+		gcloud compute disks list --project $project --zone $zone \
+			--regexp "$diskname" \
 			| grep -q $diskname
 
 		if [ $? -eq 0 ] ; then
-			pdisk_args=${pdisk_args}' '--disk' '$diskname,mode=READ_WRITE
+			pdisk_args=${pdisk_args}' '--disk' 'name=$diskname' 'mode=rw
 		else
-			gcutil adddisk \
+			gcloud compute disks create \
 				$diskname \
-				--project=$project \
-				--zone=$zone \
+				--project $project \
+				--zone $zone \
 				--size_gb ${dsize} 
 			if [ $? -eq 0 ] ; then
-				pdisk_args=${pdisk_args}' '--disk' '$diskname,mode=READ_WRITE
+				pdisk_args=${pdisk_args}' '--disk' 'name=$diskname' 'mode=rw
 			fi
 		fi
  	done
@@ -124,7 +120,6 @@ do
   --image)        image=$2 ;;
   --machine-type) machinetype=$2  ;;
   --license-file) licenseFile=$2 ;;
-  --persistent-boot) pboot=$2 ;;
   --persistent-disks) pdisk=$2 ;;
   *)
      echo "****" Bad argument:  $1
@@ -142,7 +137,6 @@ maprversion=${maprversion:-"3.1.0"}
 machinetype=${machinetype:-"n1-standard-2"}
 zone=${zone:-"us-central1-b"}
 licenseFile=${licenseFile:-"/Users/dtucker/Documents/MapR/licenses/LatestDemoLicense-M7.txt"}
-pboot=${pboot:-"true"}
 
 if [ -n "${image:-}" ] ; then
 	maprimage=$image
@@ -249,7 +243,6 @@ echo "  config-file $configFile"
 echo "     cldb: $cldbhosts"
 echo "     zk:   $zkhosts"
 echo "  image $maprimage"
-echo "  persistent-boot-disk ${pboot}"
 echo "  machine $machinetype"
 echo "  zone $zone"
 echo OPTIONAL: -----
@@ -266,18 +259,13 @@ fi
 
 # Only add metadata for metrics if we have Metrics configured
 if [ -n "${metricsnode:-}" ] ; then
-	metrics_args="--metadata=maprmetricsserver:${metricsnode:-} --metadata=maprmetricsdb:maprmetrics"
+	metrics_args="maprmetricsserver=${metricsnode:-} maprmetricsdb=maprmetrics"
 fi
 
 # Only add license arg if file exists
 if [ -n "${licenseFile}" ] ; then
 	[ -f "${licenseFile}" ] && \
-		license_args="--metadata_from_file=maprlicense:${licenseFile}" 
-fi
-
-# Add persistent boot arg if necessary
-if [ -n "${pboot}" ] ; then
-	[ "${pboot}" = "true" ] && pboot_args="--persistent_boot_disk"
+		license_args="maprlicense=${licenseFile}" 
 fi
 
 #	Since the format of each hostline is so simple (<node>:<packages>),
@@ -301,27 +289,26 @@ do
 			# Side effect ... pdisk_args is set 
 	fi
 
-	gcutil addinstance \
-		--project=$project \
-		--image=$maprimage \
-		--machine_type=$machinetype \
-		--zone=$zone \
-		${pboot_args:-} \
+	gcloud compute instances create $host \
+		--project $project \
+		--image $maprimage \
+		--machine_type $machinetype \
+		--zone $zone \
 		${pdisk_args:-} \
-		--metadata_from_file="startup-script:configure-mapr-instance.sh" \
-		--metadata_from_file="maprimagerscript:prepare-mapr-image.sh" \
-		--metadata="maprversion:${maprversion}"  \
-		--metadata="maprpackages:${packages}" \
-		${license_args:-} \
-		${metrics_args:-} \
-		--metadata="cluster:${cluster}" \
-		--metadata="zknodes:${zkhosts}" \
-		--metadata="cldbnodes:${cldbhosts}" \
-		--metadata="rmnodes:${rmhosts}" \
-		--metadata="hsnode:${hsnode}" \
-		--wait_until_running \
-		--service_account_scopes=storage-full \
-    $host &
+		--metadata_from_file \
+		  startup-script=configure-mapr-instance.sh \
+		  maprimagerscript=prepare-mapr-image.sh \
+		  ${license_args:-} \
+		--metadata \
+		  maprversion=${maprversion} \
+		  maprpackages=${packages} \
+		  ${metrics_args:-} \
+		  cluster=${cluster} \
+		  zknodes=${zkhosts} \
+		  cldbnodes=${cldbhosts} \
+		  rmnodes=${rmhosts} \
+		  hsnode=${hsnode} \
+		--scopes storage-full &
 done
 
 wait

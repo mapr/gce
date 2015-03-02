@@ -11,7 +11,7 @@
 #	instances were created with persistent boot disks and data disks
 #		(this is the default for Google Cloud as of 2014)
 #	persistent boot disk is named <hostname> (again, the default)
-#   gcutil tool is in the PATH
+#   gcloud tool is in the PATH
 #
 # Remember:
 #	The nodenames must start with lower case leters, so the cluster
@@ -29,7 +29,7 @@ usage() {
     $PROGRAM
        --project <GCE Project>
        --machine-type <machine-type>
-       --zone gcutil-zone
+       --zone zone
        --node-name <name-prefix>    # hostname prefix for cluster nodes 
        [ --cluster <clustername> ]  # unnecessary, but included for parallelism
    "
@@ -43,8 +43,8 @@ list_cluster_nodes() {
 	clstr=$1
 
 	cluster_nodes=""
-	for n in $(gcutil listinstances --project=$project \
-		--format=names --filter="name eq .*${clstr}[0-9]+" | sort) 
+	for n in $(gcloud compute instances list --project $project \
+		--regexp ".*${clstr}[0-9]+" | sort)
 	do
 		nodename=`basename $n`
 
@@ -62,7 +62,7 @@ list_cluster_nodes() {
 
 	# Build up the disk argument CAREFULLY ... the shell
 	# addition of extra ' and " characters really confuses the
-	# final invocation of gcutil
+	# final invocation of gcloud
 	#
 list_persistent_data_disks() {
 	targetNode=$1
@@ -70,13 +70,13 @@ list_persistent_data_disks() {
 		#	N disks of size S from the pdisk parameter
 
 	pdisk_args=""
-	for d in $(gcutil listdisks --project=$project --zone=$zone \
-		--format=names --filter="name eq .*-pdisk-[1-9]") 
+	for d in $(gcloud compute disks list --project $project --zone $zone \
+		--regexp ".*-pdisk-[1-9]")
 	do
 		diskname=`basename $d`
 		[ ${diskname#${targetNode}} = ${diskname} ] && continue
 
-		pdisk_args=${pdisk_args}' '--disk' '$diskname,mode=READ_WRITE
+		pdisk_args=${pdisk_args}' '--disk' 'name=$diskname' 'mode=rw
  	done
 
 	export pdisk_args
@@ -87,6 +87,11 @@ list_persistent_data_disks() {
 #  MAIN
 #
 
+if [ $# -lt 3 ] ; then
+	usage
+	exit 1
+fi
+
 while [ $# -gt 0 ]
 do
   case $1 in
@@ -94,10 +99,11 @@ do
   --project)      project=$2  ;;
   --machine-type) machinetype=$2  ;;
   --node-name)    nodeName=$2  ;;
+  --zone)         zone=$2 ;;
   *)
      echo "****" Bad argument:  $1
      usage
-     exit  ;;
+     exit 1 ;;
   esac
   shift 2
 done
@@ -107,7 +113,6 @@ done
 project=${project:-"maprtt"}
 machinetype=${machinetype:-"n1-standard-2"}
 nodeName=${nodeName:-$NODE_NAME_ROOT}
-pboot=${pboot:-"true"}
 
 
 list_cluster_nodes $nodeName
@@ -135,44 +140,34 @@ if [ -z "${YoN:-}"  -o  -n "${YoN%[yY]*}" ] ; then
 	exit 1
 fi
 
-# Always a persistent boot disk 
-pboot_args="--persistent_boot_disk"
-
 # First, delete the old instances
-gcutil deleteinstance \
-	--project=$project \
-	--zone=$zone \
-	--nodelete_boot_pd \
-	--force \
-	$cluster_nodes
 
-# Wait for deletion to be complete
 echo ""
-echo "Waiting for instances to successfully terminate"
-running_instances=1
-while [ $running_instances -ne 0 ]
-do
-	sleep 10
-	running_instances=`gcutil listinstances --project=$project --zone=$zone \
-		--format=names --filter="name eq .*${nodeName}[0-9]+" | wc -l`
-done
+echo "Deleting instances ..."
+gcloud compute instances delete $cluster_nodes \
+	--project $project \
+	--zone $zone \
+	--keep-disks boot \
+	--quiet
+
 
 # Then, add them back
+
+echo ""
+echo "Adding back instances ..."
 for host in $cluster_nodes 
 do
 	list_persistent_data_disks $host
 			# Side effect ... pdisk_args is set 
 
-	gcutil addinstance \
-		--project=$project \
-		--machine_type=$machinetype \
-		--zone=$zone \
+	gcloud compute instances create $host \
+		--project $project \
+		--machine_type $machinetype \
+		--zone $zone \
 		${pboot_args:-} \
-		--disk $host,mode=rw,boot \
+		--disk name=$host mode=rw boot=yes \
 		${pdisk_args:-} \
-		--wait_until_running \
-		--service_account_scopes=storage-full \
-    $host &
+		--scopes storage-full &
 done
 
 wait
