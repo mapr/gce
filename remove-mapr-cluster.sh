@@ -15,7 +15,7 @@
 #	be requested on the command line and automatically allocated.
 #
 # Assumptions:
-#   gcutil tool is in the PATH
+#   gcloud tool is in the PATH
 #
 #
 
@@ -41,12 +41,7 @@ usage() {
 
 	# Build up the disk argument CAREFULLY ... the shell
 	# addition of extra ' and " characters really confuses the
-	# final invocation of gcutil
-	#
-	# We could be smarter about error handling, but it's safer
-	# to simply ignore any disk where there is a problem creating
-	# it (since the most common error during our development was
-	# that the disk had already been created).
+	# final invocation of gcloud
 delete_persistent_data_disks() {
 	targetNode=$1
 		# Compute the disk specifications ... 
@@ -97,6 +92,19 @@ do
   shift 2
 done
 echo ""
+
+# Very basic error checking
+if [ -z "$project" ] ; then
+	echo "ERROR: no project specifice"
+	usage
+	exit 1
+fi
+
+if [ -z "$zone" ] ; then
+	echo "ERROR: no zone specifice"
+	usage
+	exit 1
+fi
 
 
 grep ^$NODE_NAME_ROOT $configFile | \
