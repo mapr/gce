@@ -162,7 +162,7 @@ do
 
 	gcloud compute instances create $host \
 		--project $project \
-		--machine_type $machinetype \
+		--machine-type $machinetype \
 		--zone $zone \
 		${pboot_args:-} \
 		--disk name=$host mode=rw boot=yes \
