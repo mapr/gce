@@ -163,7 +163,7 @@ function update_os_rpm() {
 
 	c yum install -y syslinux sdparm
 	c yum install -y sysstat
-	c yum install -y bind-utils
+	yum install -y bind-utils less lsof
 	yum install -y clustershell pdsh
 }
 
