@@ -557,13 +557,16 @@ EOF_redhat
     yum makecache
 }
 
-
 function setup_mapr_repo() {
-  if which dpkg &> /dev/null; then
-    setup_mapr_repo_deb
-  elif which rpm &> /dev/null; then
-    setup_mapr_repo_rpm
-  fi
+	if which dpkg &> /dev/null; then
+		setup_mapr_repo_deb
+		MAPRGPG_KEY=/tmp/maprgpg.key
+		wget -O $MAPRGPG_KEY http://package.mapr.com/releases/pub/maprgpg.key 
+		[ $? -eq 0 ] && apt-key add $MAPRGPG_KEY
+	elif which rpm &> /dev/null; then
+		setup_mapr_repo_rpm
+		rpm --import http://package.mapr.com/releases/pub/maprgpg.key
+	fi
 }
 
 
