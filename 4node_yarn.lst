@@ -1,4 +1,4 @@
 node1:zookeeper,cldb,fileserver,nodemanager,nfs,webserver,hbase
 node2:zookeeper,cldb,fileserver,nodemanager,nfs,hbase
-node3:zookeeper,resourcemanager,historyserver,fileserver,nodemanager,nfs,hbase
-node4:resourcemanager,fileserver,nodemanager,nfs,hbase
+node3:zookeeper,fileserver,nodemanager,nfs,hbase
+node4:resourcemanager,historyserver,fileserver,nodemanager,nfs,hbase
