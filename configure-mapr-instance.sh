@@ -464,6 +464,7 @@ update_site_config() {
 
 	MAPRED_CONF_FILE=${HADOOP_CONF_DIR}/mapred-site.xml
 	CORE_CONF_FILE=${HADOOP_CONF_DIR}/core-site.xml
+	YARN_CONF_FILE=${HADOOP_CONF_DIR}/yarn-site.xml
 
 		# core-site changes need to include namespace mappings
     sed -i '/^<\/configuration>/d' ${CORE_CONF_FILE}
@@ -477,6 +478,25 @@ update_site_config() {
 	echo "" | sudo tee -a ${CORE_CONF_FILE}
 	echo '</configuration>' | tee -a ${CORE_CONF_FILE}
 
+		# yarn-site changes needed for early 4.x releases, where 
+		# yarn.resourcemanager.hostname is not properly recognized
+		# by the web proxying services.   If we have only one
+		# resource manager, force this fix to avoid the problem
+	[ ! -f $YARN_CONF_FILE ] && return
+
+	num_rms=`echo ${rmnodes//,/ } | wc -w`
+	[ ${num_rms:-0} -ne 1 ] && return
+
+    sed -i '/^<\/configuration>/d' ${YARN_CONF_FILE}
+
+	echo "
+<property>
+<name>yarn.resourcemanager.hostname</name>
+<value>$rmnodes</value>
+</property>" | tee -a ${YARN_CONF_FILE}
+
+	echo "" | tee -a ${YARN_CONF_FILE}
+	echo '</configuration>' | tee -a $YARN_CONF_FILE}
 }
 
 
