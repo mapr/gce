@@ -496,7 +496,7 @@ update_site_config() {
 </property>" | tee -a ${YARN_CONF_FILE}
 
 	echo "" | tee -a ${YARN_CONF_FILE}
-	echo '</configuration>' | tee -a $YARN_CONF_FILE}
+	echo '</configuration>' | tee -a ${YARN_CONF_FILE}
 }
 
 
