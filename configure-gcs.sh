@@ -33,7 +33,7 @@ murl_attr="${murl_top}/instance/attributes"
 md_header="Metadata-Flavor: Google"
 
 GCE_PROJECT=$(curl -H "$md_header" -f $murl_top/project/project-id)
-GCS_VERSION=1.2.9
+GCS_VERSION=1.3.3
 CONFIGBUCKET=gsdefault
 GCS_TEMPLATE_FILE=$HOME/gcs-core-template.xml
 
