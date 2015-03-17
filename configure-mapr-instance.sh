@@ -473,9 +473,9 @@ update_site_config() {
 <property>
   <name>hbase.table.namespace.mappings</name>
   <value>*:/user/\${user.name}</value>
-</property>" | sudo tee -a ${CORE_CONF_FILE}
+</property>" | tee -a ${CORE_CONF_FILE}
 
-	echo "" | sudo tee -a ${CORE_CONF_FILE}
+	echo "" | tee -a ${CORE_CONF_FILE}
 	echo '</configuration>' | tee -a ${CORE_CONF_FILE}
 
 		# yarn-site changes needed for early 4.x releases, where 
