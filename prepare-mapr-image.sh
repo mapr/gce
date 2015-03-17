@@ -227,6 +227,9 @@ function update_ssh_config() {
 	# allow ssh via keys (some virtual environments disable this)
   sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' $SSHD_CONFIG
 
+	# allow roaming (GCE disabled this in 2014 ... for unknown reasons)
+  sed -i 's/^#[ ]*HostbasedAuthentication.*/HostbasedAuthentication yes/g' $SSHD_CONFIG
+
 	# For Dev Clusters ONLY !!!
 	#	allow ssh password prompt (only for our dev clusters)
 	#	root login via passwordless ssh
