@@ -271,7 +271,7 @@ do
 
 	if [ -n "${pdisk:-}" ] ; then
 		echo ""
-		echo "   Creating persistent data volumes first (pdisk)"
+		echo "   Creating persistent data volumes first ($pdisk)"
 		create_persistent_data_disks $host
 			# Side effect ... pdisk_args is set 
 			#
