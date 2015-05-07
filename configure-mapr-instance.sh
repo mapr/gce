@@ -567,8 +567,8 @@ configure_mapr_nfs() {
 
 		# For RedHat distros, we need to start up NFS services
 	if which rpm &> /dev/null; then
-		/etc/init.d/rpcbind restart
-		/etc/init.d/nfslock restart
+		service rpcbind restart
+		service nfslock restart
 	fi
 
 	echo "Mounting ${MAPR_NFS_SERVER}:/mapr to $MAPR_FSMOUNT" >> $LOG
@@ -706,8 +706,8 @@ innodb_data_file_path=ibdata1:10M:autoextend:max:1024M" $MYCNF
 	fi
 
 		# Startup MySQL so the rest of this stuff will work
-	[ -x /etc/init.d/mysql ]   &&  service mysql  start
-	[ -x /etc/init.d/mysqld ]  &&  service mysqld start
+	[ service mysql status &> /dev/null ]   &&  service mysql start
+	[ service mysqld status &> /dev/null ]  &&  service mysqld start
 
 		# At this point, we can customize the MySQL installation 
 		# as needed.   For now, we'll just enable multiple connections
@@ -969,7 +969,7 @@ finalize_mapr_cluster() {
 }
 
 
-function main()
+function configure_instance()
 {
 	echo "Instance initialization started at "`date` >> $LOG
 
@@ -1081,6 +1081,19 @@ function main()
 
 	echo "Instance initialization completed at "`date` >> $LOG
 	echo INSTANCE READY >> $LOG
+}
+
+
+function main()
+{
+		# When attached to an instance as the start-script,
+		# this script is run EVERY TIME ... so we need to avoid
+		# trashing our previous installation.
+	if [ -f $MAPR_HOME/conf/mapr-clusters.conf ] ; then
+		exit 0
+	fi
+
+	configure_instance
 	return 0
 }
 
