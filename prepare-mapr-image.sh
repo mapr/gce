@@ -171,6 +171,9 @@ function update_os_rpm() {
 # Key Assumption: the /etc/ntp.conf file is reasonable for the 
 #	hosting cloud platform.   We could shove our own NTP servers into
 #	place, but that seems like a risk.
+#
+#	NOTE: This does not handle the latest systemctl model.   
+#		TBD : fix for CentOS 7
 function update_ntp_config() {
 	echo "  updating NTP configuration" >> $LOG
 
@@ -237,8 +240,8 @@ function update_ssh_config() {
   sed -i 's/PasswordAuthentication .*no$/PasswordAuthentication yes/' $SSHD_CONFIG
   sed -i 's/PermitRootLogin .*no$/PermitRootLogin yes/' $SSHD_CONFIG
 
-	[ -x /etc/init.d/ssh ]   &&  /etc/init.d/ssh  restart
-	[ -x /etc/init.d/sshd ]  &&  /etc/init.d/sshd restart
+	[ service ssh status &> /dev/null ]   &&  service ssh restart
+	[ service sshd status &> /dev/null ]  &&  service sshd restart
 }
 
 function update_os() {
