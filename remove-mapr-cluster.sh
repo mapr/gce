@@ -27,10 +27,10 @@ usage() {
   echo "
   Usage:
     $PROGRAM
-       --project <GCE Project>
        --config-file <cfg-file>         # Need to the same as lanch-mapr-cluster.sh used
        --persistent-disks <nxm>         # N disks of M gigabytes, need to the same as lanch-mapr-cluster.sh used
        --zone <zone>                    # GCE zone
+      [ --project <GCE Project ID>     # uses gcloud config default ]
       [ --node-name <name-prefix>      # hostname prefix for cluster nodes ]
    "
   echo ""
@@ -61,7 +61,7 @@ delete_persistent_data_disks() {
 		echo "Delete pdisk ${diskname}"
 		gcloud compute disks delete -q \
 			$diskname \
-			--project $project \
+			${project_arg:-} \
 			--zone $zone
  	done
 }
@@ -95,10 +95,16 @@ echo ""
 
 # Very basic error checking
 if [ -z "$project" ] ; then
-	echo "ERROR: no project specifice"
-	usage
-	exit 1
+	gcloud config list | grep -q "^project"
+	if [ $? -ne 0 ] ; then
+		echo "ERROR: no project specified"
+		usage
+		exit 1
+	fi
+else
+	project_arg="--project $project"
 fi
+
 
 if [ -z "$zone" ] ; then
 	echo "ERROR: no zone specifice"
@@ -116,14 +122,14 @@ do
 
 	echo "Remove instance $host"
 	gcloud compute instances delete -q \
-		--project $project \
+		${project_arg:-} \
 		--zone $zone \
 		--keep-disks boot \
 		$host
 
 	echo "Remove disk $host"
 	gcloud compute disks delete -q \
-		--project $project \
+		${project_arg:-} \
 		--zone $zone \
 		$host
 
