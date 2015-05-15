@@ -16,8 +16,8 @@
 [ $# -lt 4 ] || {
 	echo "usage: $0 <new instance name> <base image>  <MapR version>  [ <zone> ]  [ <project> ]"
 	echo "    example: $0 mrc-01  ubuntu-12-04  4.0.2"
-	echo "    <zone> defaults to us-central1-a, and
-	echo "    <project> defaults to "maprtt"
+	echo "    <zone> defaults to us-central1-a, and"
+	echo "    <project> defaults to value stored with 'gcloud config'"
 	exit 1
 }
 
@@ -25,7 +25,14 @@ instName=$1
 baseImage=$2
 maprversion=$3
 GCE_ZONE=${4:-"us-central1-a"}
-GCE_PROJECT=${5:-"maprtt"}
+
+if [ -n "${5:-}" ] ; then
+	GCE_PROJECT=${5:-}
+else
+	GCE_PROJECT=`gcloud config list | grep "^project" | awk '{print $NF}'`
+fi
+
+
 
 # ToBeDone
 #	Images can be local to our project, or base images for the Google
@@ -41,7 +48,7 @@ echo gcloud compute --project=$GCE_PROJECT \
     --metadata \
 	  image=$baseImage \
       maprversion=$maprversion \
-      maprpackages=cldb,jobtracker,fileserver,tasktracker \
+      maprpackages=fileserver \
     --metadata-from-file \
 	  startup-script=prepare-mapr-image.sh \
     --zone=$GCE_ZONE \
@@ -53,7 +60,7 @@ gcloud compute --project=$GCE_PROJECT \
     --metadata \
 	  image=$baseImage \
       maprversion=$maprversion \
-      maprpackages=cldb,jobtracker,fileserver,tasktracker \
+      maprpackages=fileserver \
     --metadata-from-file \
 	  startup-script=prepare-mapr-image.sh \
     --zone=$GCE_ZONE \

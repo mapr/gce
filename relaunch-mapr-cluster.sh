@@ -27,15 +27,15 @@ usage() {
   echo "
   Usage:
     $PROGRAM
-       --project <GCE Project>
        --machine-type <machine-type>
        --zone zone
        --node-name <name-prefix>    # hostname prefix for cluster nodes 
+       [ --project <GCE Project ID> ]    # uses gcloud config default ]
        [ --cluster <clustername> ]  # unnecessary, but included for parallelism
    "
   echo ""
   echo "EXAMPLES"
-  echo "$0 --project <MyProject> --node-name prod"
+  echo "$0 --zone us-central1-a --node-name prod"
 }
 
 
@@ -43,7 +43,7 @@ list_cluster_nodes() {
 	clstr=$1
 
 	cluster_nodes=""
-	for n in $(gcloud compute instances list --project $project \
+	for n in $(gcloud compute instances list ${project:-} \
 		--regexp ".*${clstr}[0-9]+" | sort)
 	do
 		nodename=`basename $n`
@@ -70,7 +70,7 @@ list_persistent_data_disks() {
 		#	N disks of size S from the pdisk parameter
 
 	pdisk_args=""
-	for d in $(gcloud compute disks list --project $project --zone $zone \
+	for d in $(gcloud compute disks list ${project_arg:-} --zone $zone \
 		--regexp ".*-pdisk-[1-9]")
 	do
 		diskname=`basename $d`
@@ -90,6 +90,18 @@ list_persistent_data_disks() {
 if [ $# -lt 3 ] ; then
 	usage
 	exit 1
+fi
+
+# Very basic error checking
+if [ -z "$project" ] ; then
+	gcloud config list | grep -q "^project"
+	if [ $? -ne 0 ] ; then
+		echo "ERROR: no project specified"
+		usage
+		exit 1
+	fi
+else
+	project_arg="--project $project"
 fi
 
 while [ $# -gt 0 ]
@@ -145,7 +157,7 @@ fi
 echo ""
 echo "Deleting instances ..."
 gcloud compute instances delete $cluster_nodes \
-	--project $project \
+	${project_arg:-} \
 	--zone $zone \
 	--keep-disks boot \
 	--quiet
@@ -161,7 +173,7 @@ do
 			# Side effect ... pdisk_args is set 
 
 	gcloud compute instances create $host \
-		--project $project \
+		${project_arg:-} \
 		--machine-type $machinetype \
 		--zone $zone \
 		${pboot_args:-} \
