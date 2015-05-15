@@ -36,14 +36,14 @@ usage() {
   echo "
   Usage:
     $PROGRAM
-       --project <GCE Project>
        --cluster <clustername>
-       --mapr-version <version, eg 3.0.3, 3.1.0, 4.0.0>
+       --mapr-version <version, eg 3.1.1, 4.1.0>
        --config-file <cfg-file>
        --image image_name
        --machine-type <machine-type>
        --persistent-disks <nxm>         # N disks of M gigabytes 
        --zone zone
+       [ --project <GCE Project ID>     # uses gcloud config default ]
        [ --node-name <name-prefix>      # hostname prefix for cluster nodes ]
        [ --license-file <license to be installed> ]
    "
@@ -77,7 +77,7 @@ create_persistent_data_disks() {
 	do
 		diskname=${targetNode}-pdisk-${d}
 
-		gcloud compute disks list --project $project --zone $zone \
+		gcloud compute disks list ${project_arg:-} --zone $zone \
 			--regexp "$diskname" \
 			| grep -q $diskname
 
@@ -86,7 +86,7 @@ create_persistent_data_disks() {
 		else
 			gcloud compute disks create \
 				$diskname \
-				--project $project \
+				${project_arg:-} \
 				--zone $zone \
 				--size ${dsize}GB
 			if [ $? -eq 0 ] ; then
@@ -132,11 +132,9 @@ echo ""
 
 
 # Defaults
-project=${project:-"maprtt"}
-maprversion=${maprversion:-"3.1.0"}
+maprversion=${maprversion:-"4.1.0"}
 machinetype=${machinetype:-"n1-standard-2"}
 zone=${zone:-"us-central1-b"}
-licenseFile=${licenseFile:-"/Users/dtucker/Documents/MapR/licenses/LatestDemoLicense-M7.txt"}
 
 if [ -n "${image:-}" ] ; then
 	maprimage=$image
@@ -223,7 +221,7 @@ fi
 
 
 echo CHECK: -----
-echo "  project $project"
+echo "  project-id ${project:-default}"
 echo "  cluster $cluster"
 echo "  mapr-version $maprversion"
 echo "  config-file $configFile"
@@ -243,6 +241,8 @@ if [ -z "${YoN:-}"  -o  -n "${YoN%[yY]*}" ] ; then
 	exit 1
 fi
 
+# Set gcloud args based on input
+[ -n "$project" ] && project_arg="--project $project"
 
 # Only add metadata for metrics if we have Metrics configured
 if [ -n "${metricsnode:-}" ] ; then
@@ -281,7 +281,7 @@ do
 	fi
 
 	gcloud compute instances create $host \
-		--project $project \
+		${project_arg:-} \
 		--image $maprimage \
 		--machine-type $machinetype \
 		--zone $zone \
@@ -292,15 +292,20 @@ do
 		  ${license_args:-} \
 		--metadata \
 		  maprversion=${maprversion} \
-		  maprpackages=${packages} \
+		  maprpackages=${packages//,/:} \
 		  ${metrics_args:-} \
 		  cluster=${cluster} \
-		  zknodes=${zkhosts} \
-		  cldbnodes=${cldbhosts} \
-		  rmnodes=${rmhosts} \
+		  zknodes=${zkhosts//,/:} \
+		  cldbnodes=${cldbhosts//,/:} \
+		  rmnodes=${rmhosts//,/:} \
 		  hsnode=${hsnode} \
 		--scopes storage-full &
 done
 
 wait
+
+
+echo ""
+gcloud compute instances list ${project_arg:-} --zone $zone \
+	| grep ^${host%${idx}}
 
