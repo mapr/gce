@@ -69,6 +69,13 @@ restore_hostid=$(curl -H "$md_header" -f $murl_attr/maprhostid)
 
 LOG=/tmp/configure-mapr-instance.log
 
+# gcloud doesn't support comma-separated lists in metadata,
+# so we have to fix here
+MAPR_PACKAGES=${MAPR_PACKAGES//:/,}
+zknodes=${zknodes//:/,}
+cldbnodes=${cldbnodes//:/,}
+rmnodes="${rmnodes//:/,}"
+
 # Make sure sbin tools are in PATH
 PATH=/sbin:/usr/sbin:$PATH
 
