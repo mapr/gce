@@ -46,6 +46,7 @@ MAPR_IMAGER_SCRIPT=$(curl -H "$md_header" -f $murl_attr/maprimagerscript)
 MAPR_VERSION=$(curl -H "$md_header" $murl_attr/maprversion)
 MAPR_PACKAGES=$(curl -H "$md_header" -f $murl_attr/maprpackages)
 MAPR_LICENSE=$(curl -H "$md_header" -f $murl_attr/maprlicense)
+[ ${#MAPR_LICENSE} -eq 0 ] && MAPR_LICENSE=$(curl -f http://maprtech-emr.s3.amazonaws.com/licenses/MaprMarketplaceM3License.txt)
 MAPR_NFS_SERVER=$(curl -H "$md_header" -f $murl_attr/maprnfsserver)
 
 MAPR_METRICS_DEFAULT=metrics
