@@ -432,7 +432,7 @@ function add_mapr_user() {
 			# with the pre-existing account.
 			#	NOTE: we ONLY do this if a UID was passed in
 		target_uid=$(curl -f $murl_attr/mapruid)
-		if [ -n "${target_uid}" -a  `id $MAPR_USER` -ne ${target_uid} ] ; then
+		if [ -n "${target_uid}" -a  `id -u $MAPR_USER` -ne "${target_uid:-0}" ] ; then
 			echo "updating ${MAPR_USER} account to uid ${MAPR_UID}" >> $LOG
 			usermod -u ${target_uid} ${MAPR_USER}
 			groupmod -g ${target_uid} ${MAPR_USER}
@@ -588,7 +588,7 @@ function setup_mapr_repo() {
 #	all cases.
 
 MAPR_ENV_FILE=$MAPR_HOME/conf/env.sh
-update-env-sh()
+update_env_sh()
 {
 	[ -z "${1:-}" ] && return 1
 	[ -z "${2:-}" ] && return 1
@@ -623,8 +623,8 @@ install_mapr_packages() {
 	fi
 
 	echo Configuring $MAPR_ENV_FILE  >> $LOG
-	update-env-sh MAPR_HOME $MAPR_HOME
-	update-env-sh JAVA_HOME $JAVA_HOME
+	update_env_sh MAPR_HOME $MAPR_HOME
+	update_env_sh JAVA_HOME $JAVA_HOME
 }
 
 
