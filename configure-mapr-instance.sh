@@ -109,7 +109,7 @@ c() {
 # prepare-mapr-image.sh).  WILL NOT override existing settings
 #
 MAPR_ENV_FILE=$MAPR_HOME/conf/env.sh
-function update-env-sh()
+function update_env_sh()
 {
 	[ -z "${1:-}" ] && return 1
 	[ -z "${2:-}" ] && return 1
@@ -260,8 +260,8 @@ install_mapr_packages() {
 	fi
 
 	echo Configuring $MAPR_ENV_FILE  >> $LOG
-	update-env-sh MAPR_HOME $MAPR_HOME
-	update-env-sh JAVA_HOME $JAVA_HOME
+	update_env_sh MAPR_HOME $MAPR_HOME
+	update_env_sh JAVA_HOME $JAVA_HOME
 
 	echo MapR software installation complete >> $LOG
 
