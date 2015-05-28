@@ -418,6 +418,20 @@ function install_java() {
 		echo updating /etc/profile.d/javahome.sh >> $LOG
 		echo "JAVA_HOME=${JAVA_HOME}"   > /etc/profile.d/javahome.sh
 		echo "export JAVA_HOME"        >> /etc/profile.d/javahome.sh
+
+			# Update link to java in primary path if necessary
+			# We need to do this because the Oracle JDK installation
+			# DOES NOT overwrite the link to the OpenJDK JRE java
+			# (even as it creates /usr/bin links for every other component)
+		if [ -n "${javacmd:-}" ] ; then
+			javatarget=`readlink -f $javacmd`
+			jdktarget=`readlink -f $JAVA_HOME/bin/java`
+			if [ "$javatarget" != "$jdktarget" ] ; then
+				ln -f -s $JAVA_HOME/bin/java ${javacmd}
+			fi
+		elif [ ! -x /usr/bin/java ] ; then
+			ln -s $JAVA_HOME/bin/java /usr/bin/java
+		fi
 	else
 		echo Java installation failed >> $LOG
 	fi
