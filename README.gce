@@ -5,15 +5,6 @@ DIRECTORY CONTENTS
 		simple configuration file (see the *.lst examples)
 		to deploy a cluster in your GCE environment.
 
-	relaunch-mapr-cluster.sh : 
-		High-level script to respawn the instances deployed with
-		launch-mapr-cluster.sh for a MapR instance.  This was 
-		necessary with early versions of Google Compute Cloud (Apr 2014),
-		where there was no concept of "stop" and "restart" for instances;
-		you much delete and relaunch instances with the same
-		persisitent storage created during the initial launch.
-			NOTE: No longer necessary as of Fall 2014
-
 	remove-mapr-cluster.sh : 
 		Helper utility to terminate GCE instances and all persistent
 		storage associated with a cluster.
@@ -49,12 +40,20 @@ DIRECTORY CONTENTS
 		Google-Cloud-Storage connector.   
 			TBD: add option to execute this within launch-mapr-cluster.sh
 
-	launch-mr-cluster.sh (obsolete): 
-		Very simple script to create a multi-node 
-		MapReduce cluster within the GCE environment.  The script
-		takes a limited view of of cluster features (using "masters"
-		and "slaves" rather than leveraging the service-oriented 
-		model of MapR).  
+	launch-admin-training-cluster.sh : 
+		To support MapR's on-demand training courses, this script
+		will launch a set of nodes in GCE but not automatically
+		install the MapR software ... thus allowing the student
+		to learn the mechanics of installation/configuration process.
+
+	relaunch-mapr-cluster.sh : 
+		High-level script to respawn the instances deployed with
+		launch-mapr-cluster.sh for a MapR instance.  This was 
+		necessary with early versions of Google Compute Cloud (Apr 2014),
+		where there was no concept of "stop" and "restart" for instances;
+		you much delete and relaunch instances with the same
+		persisitent storage created during the initial launch.
+			NOTE: No longer necessary as of Fall 2014
 
 
 GETTING STARTED
