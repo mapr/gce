@@ -76,9 +76,14 @@ then
   exit 1
 fi
 
+#	While parsing args, we'll simply pass over a few
+#	ones that may have been left in the command line 
+#	from launching the cluster ... even though we don't
+#	need them here.
 while [ $# -gt 0 ]
 do
   case $1 in
+  --cluster)      cluster=$2  ;;
   --config-file)  configFile=$2  ;;
   --node-name)    nodeName=$2  ;;
   --project)      project=$2  ;;
