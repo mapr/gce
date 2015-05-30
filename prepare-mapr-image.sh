@@ -19,7 +19,7 @@
 # Tested with MapR 2.x, 3.x, and 4.x
 #
 # JAVA
-#	This script default to OpenJDK; the logic to support Oracle JDK 
+#	This script defaults to OpenJDK; the logic to support Oracle JDK 
 #   is included for users who which to implicitly accept Oracle's 
 #	end-user license agreement.
 #
@@ -71,6 +71,8 @@ MAPR_PACKAGES=$(curl -H "$md_header" -f $murl_attr/maprpackages)
 MAPR_PACKAGES=${MAPR_PACKAGES:-"core,fileserver"}
 MAPR_PACKAGES=${MAPR_PACKAGES//:/,}
 
+TRAINING_UID=$(curl -H "$md_header" -f $murl_attr/traininguid)
+TRAINING_UID=${TRAINING_UID:-"4000"}
 
 LOG=/tmp/prepare-mapr-image.log
 OUT=/tmp/prepare-mapr-image.out
@@ -455,7 +457,7 @@ function add_mapr_user() {
 		return 0 
 	fi
 
-	echo "useradd -u $MAPR_UID -c MapR -m -s /bin/bash" >> $LOG
+	echo "useradd -u $MAPR_UID -c MapR -m -s /bin/bash $MAPR_USER" >> $LOG
 	useradd -u $MAPR_UID -c "MapR" -m -s /bin/bash $MAPR_USER 2> /dev/null
 	if [ $? -ne 0 ] ; then
 			# Assume failure was dup uid; try with default uid assignment
@@ -511,6 +513,37 @@ EOF_bashrc
 		# Add MapR user to sudo group if it exists
 	grep -q -e "^sudo:" /etc/group
 	[ $? -eq 0 ] && usermod -G sudo $MAPR_USER
+
+	return 0
+}
+
+function add_training_users() {
+	echo Adding/configuring sample users for admin training >> $LOG
+
+	NUSERS=3
+	for (( i=1 ; i<=NUSERS ; i++ )) ; do
+		TUSER="user${i}"
+		TUSER_PASSWD="password${i}"
+		TUID=$[TRAINING_UID+$i]
+
+		echo "useradd -u $TUID -c AdminTraining -m -s /bin/bash $TUSER" >> $LOG
+		useradd -u $TUID -c "AdminTraining" -m -s /bin/bash $TUSER 2> /dev/null
+		if [ $? -ne 0 ] ; then
+				# Assume failure was dup uid; try with default uid assignment
+			echo "useradd returned $?; trying auto-generated uid" >> $LOG
+			useradd -c "AdminTraining" -m -s /bin/bash $TUSER
+		fi
+
+		if [ $? -ne 0 ] ; then
+			echo "Failed to create new user $TUSER {error code $?}"
+		else
+			passwd $TUSER << passwdEOF > /dev/null
+$TUSER_PASSWD
+$TUSER_PASSWD
+passwdEOF
+
+		fi
+	done
 
 	return 0
 }
@@ -672,16 +705,31 @@ function disable_mapr_services()
 
 # High level wrapper around the above scripts. 
 # Ideally, we should handle errors correctly here.
+#
+# Remember that this script is used in two different circumstances:
+#	1. to initialize nodes for the training class
+#	2. as part of a full MapR installation 
+#	  (invoked by configure-mapr-instance.sh)
+#
 main() {
+		# Do nothing if we've been run on a previous instance startup
+		# (GCE has the behavior of running "startup-script"
+		# every time an instance is started).
+	[ -f /var/log/`basename $LOG` ] && exit 0
+
 	echo "Image creation started at "`date` >> $LOG
 	
 	update_os
 	install_java
 
-	add_mapr_user
-	setup_mapr_repo
-	install_mapr_packages
-	disable_mapr_services
+	if [ "$MAPR_PACKAGES" = "none" ] ; then
+		add_training_users
+	else
+		add_mapr_user
+		setup_mapr_repo
+		install_mapr_packages
+		disable_mapr_services
+	fi
 
 	echo "Image creation completed at "`date` >> $LOG
 	echo IMAGE READY >> $LOG
@@ -691,8 +739,10 @@ main() {
 main
 exitCode=$?
 
-# Save of the install log to ~${MAPR_USER}; some cloud images
-# use AMI's that automatically clear /tmp with every reboot
+# Save of the install log to /var/log and ~${MAPR_USER}; some cloud 
+# images use AMI's that automatically clear /tmp with every reboot
+cp $LOG /var/log
+
 MAPR_USER_DIR=`eval "echo ~${MAPR_USER}"`
 if [ -n "${MAPR_USER_DIR}"  -a  -d ${MAPR_USER_DIR} ] ; then
 		cp $LOG $MAPR_USER_DIR
