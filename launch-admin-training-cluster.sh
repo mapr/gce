@@ -21,7 +21,6 @@ usage() {
   echo "
   Usage:
     $PROGRAM
-       --cluster <clustername>
        --config-file <cfg-file>
        --image image_name
        --machine-type <machine-type>
@@ -32,7 +31,7 @@ usage() {
    "
   echo ""
   echo "EXAMPLES"
-  echo "$0 --cluster TrainingCluster --config-file 3node.lst --node-name odt --image centos-6  --machine-type n1-highmem-2 --persistent-disks 2x256"
+  echo "$0 --config-file 3node.lst --node-name odt --image centos-6  --machine-type n1-highmem-2 --persistent-disks 2x256"
 }
 
 
@@ -144,7 +143,6 @@ fi
 
 echo CHECK: -----
 echo "  project-id ${project:-default}"
-echo "  cluster $cluster"
 echo "  config-file $configFile"
 echo "  image $maprimage"
 echo "  machine $machinetype"
@@ -198,7 +196,6 @@ do
 		--metadata \
 		  maprversion=${maprversion} \
 		  maprpackages=none \
-		  cluster=${cluster} \
 		--scopes storage-full &
 done
 
