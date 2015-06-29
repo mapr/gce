@@ -187,6 +187,44 @@ EOF_bashrc
 	return 0
 }
 
+function add_extra_users() {
+	echo "Adding/configuring additional users" >> $LOG
+
+		# We need to have the MAPRP_USER, since these users
+		# will be in the same group.
+	id $MAPR_USER &> /dev/null
+	[ $? -ne 0 ] && return $? ;
+
+	MAPR_GUID=`id -g $MAPR_USER`
+
+	i=1
+	while [ $i -le 1 ] ; do
+		NEW_USER="user0$i"
+
+		echo "useradd -u $[MAPR_UID+$i] -g $MAPR_GUID -c users -m -s /bin/bash $NEW_USER" >> $LOG
+		useradd -u $[MAPR_UID+$i] -g $MAPR_GUID -c "users" -m -s /bin/bash $NEW_USER 2> /dev/null
+		if [ $? -ne 0 ] ; then
+				# Assume failure was dup uid; try with default uid assignment
+			echo "useradd returned $?; trying auto-generated uid" >> $LOG
+			useradd -g $MAPR_GUID -g $MAPR_GUID -c "MapR" -m -s /bin/bash $NEW_USER
+		fi
+
+		if [ $? -ne 0 ] ; then
+			echo "Failed to create new user user0$i {error code $?}"
+		else
+			passwd $NEW_USER << passwdEOF > /dev/null
+${MAPR_PASSWD}${NEW_USER}
+${MAPR_PASSWD}${NEW_USER}
+passwdEOF
+
+		fi
+
+		i=$[i+1]
+	done
+
+	return 0
+}
+
 # Use imager script to do our initial setup.  Exit on failure
 prepare_instance() {
 	if [ ! -d ${MAPR_HOME} ] ; then
@@ -1004,6 +1042,7 @@ function configure_instance()
 	fi
 
 	add_mapr_user
+	add_extra_users
 
 	configure_host_identity 
 
