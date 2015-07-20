@@ -162,9 +162,6 @@ passwdEOF
 	su $MAPR_USER -c "cp -p ~${MAPR_USER}/.ssh/id_rsa.pub ~${MAPR_USER}/.ssh/authorized_keys"
 	su $MAPR_USER -c "chmod 600 ~${MAPR_USER}/.ssh/authorized_keys"
 		
-		# TBD : copy the key-pair used to launch the instance directly
-		# into the mapr account to simplify connection from the
-		# launch client.
 	MAPR_USER_DIR=`eval "echo ~${MAPR_USER}"`
 
 		# Enhance the login with rational stuff
@@ -247,8 +244,7 @@ prepare_instance() {
 }
 
 
-# Takes the packages defined by MAPR_PACKAGES and makes sure
-# that those (and only those) are installed.
+# Install MAPR_PACKAGES (and ensure ONLY those are installed)
 #
 install_mapr_packages() {
 	if [ -z "${MAPR_PACKAGES:-}" ] ; then
@@ -420,11 +416,8 @@ configure_host_identity() {
 #			MAPR_METRICS_DEFAULT	(global)
 #			MAPR_PACKAGES		(global)
 #
-# NOTE: It is simpler to use the hostname for mysql connections
-#	even on the host running the mysql instance (probably because 
-#	of mysql's strange handling of "localhost" when validating
-#	login privileges).
-
+# NOTE: Always use the hostname for mysql connections
+#
 configure_mapr_metrics() {
 	[ -z "${MAPR_METRICS_SERVER:-}" ] && return 0
 	[ -z "${MAPR_METRICS_DB:-}" ] && return 0
@@ -441,9 +434,6 @@ configure_mapr_metrics() {
 
 	# If the metrics server is specified, mapr-metrics must be
 	# installed on every job tracker and webserver system 
-	#
-	#	NOTE: also handle the unlikely case that the METRICS_SERVER 
-	#	is specified WITHOUT the metrics package selected
 	if [ ! -f $MAPR_HOME/roles/metrics ] ; then
 		installMetrics=0
 		[ $MAPR_METRICS_SERVER == $THIS_HOST ] && installMetrics=1
@@ -469,8 +459,8 @@ configure_mapr_metrics() {
 }
 
 
-# Simple script to do any config file customization prior to 
-# program launch
+# Simple script to customize MapR deployment *.conf files
+#
 configure_mapr_services() {
 	echo "Updating configuration for MapR services" >> $LOG
 
@@ -493,8 +483,6 @@ configure_mapr_services() {
 }
 
 # Simple script to update Hadoop configuraton files.
-# This should be done as a separate Python or Perl script 
-# to better handle the xml format !!!
 #
 update_site_config() {
 	echo "Updating site configuration files" >> $LOG
@@ -546,8 +534,8 @@ update_site_config() {
 }
 
 
-#  Wait until DNS can find all the zookeeper nodes
-#	TBD: put a timeout ont this ... it's not a good design to wait forever
+#  Delay until all zknodes are resolve
+#	TBD: add timeout
 #
 function resolve_zknodes() {
 	echo "WAITING FOR DNS RESOLUTION of zookeeper nodes {$zknodes}" >> $LOG
@@ -799,8 +787,6 @@ function disable_mapr_services()
 }
 
 
-# For now, we won't error-out if the enabling auto-start of the
-# mapr-services fails.  Debian seems to have problems with update-rc.d.
 function enable_mapr_services() 
 {
 	echo Enabling MapR services >> $LOG
@@ -1133,9 +1119,7 @@ function configure_instance()
 
 function main()
 {
-		# When attached to an instance as the start-script,
-		# this script is run EVERY TIME ... so we need to avoid
-		# trashing our previous installation.
+		# Make the script idempotent
 	if [ -f $MAPR_HOME/conf/mapr-clusters.conf ] ; then
 		exit 0
 	fi
@@ -1144,12 +1128,11 @@ function main()
 	return 0
 }
 
-
 main
 exitCode=$?
 
-# Save of the install log to ~${MAPR_USER}; some cloud images
-# use AMI's that automatically clear /tmp with every reboot
+# Save of the install log to ~${MAPR_USER} to avoid losing it
+# when /tmp is cleaned out.
 MAPR_USER_DIR=`eval "echo ~${MAPR_USER}"`
 if [ -n "${MAPR_USER_DIR}"  -a  -d ${MAPR_USER_DIR} ] ; then
 		cp $LOG $MAPR_USER_DIR
