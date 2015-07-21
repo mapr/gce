@@ -187,7 +187,7 @@ EOF_bashrc
 function add_extra_users() {
 	echo "Adding/configuring additional users" >> $LOG
 
-		# We need to have the MAPRP_USER, since these users
+		# We need to have the MAPR_USER, since these users
 		# will be in the same group.
 	id $MAPR_USER &> /dev/null
 	[ $? -ne 0 ] && return $? ;
