@@ -158,7 +158,6 @@ passwdEOF
 		# Create sshkey for $MAPR_USER (must be done AS MAPR_USER)
 	su $MAPR_USER -c "mkdir ~${MAPR_USER}/.ssh ; chmod 700 ~${MAPR_USER}/.ssh"
 	su $MAPR_USER -c "ssh-keygen -q -t rsa -f ~${MAPR_USER}/.ssh/id_rsa -P '' "
-	su $MAPR_USER -c "cp -p ~${MAPR_USER}/.ssh/id_rsa ~${MAPR_USER}/.ssh/id_launch"
 	su $MAPR_USER -c "cp -p ~${MAPR_USER}/.ssh/id_rsa.pub ~${MAPR_USER}/.ssh/authorized_keys"
 	su $MAPR_USER -c "chmod 600 ~${MAPR_USER}/.ssh/authorized_keys"
 		
